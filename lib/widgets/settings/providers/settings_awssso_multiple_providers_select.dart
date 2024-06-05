@@ -5,11 +5,11 @@ import 'package:uuid/uuid.dart';
 
 import 'package:kubenav/models/cluster_provider.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/services/providers/aws_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/settings/clusters/settings_reuse_provider_config_actions.dart';
 import 'package:kubenav/widgets/shared/app_bottom_sheet_widget.dart';
 
@@ -63,7 +63,7 @@ class _SettingsAWSSSOMultipleProvidersSelectState
   /// cluster providers. Before each account is added we also have to get the
   /// sso credentials for this account, so that we can use the account to get a
   /// the list of Kubernetes clusters from the AWS API.
-  Future<void> _addProviders(BuildContext context) async {
+  Future<void> _addProviders() async {
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: false,
@@ -125,12 +125,13 @@ class _SettingsAWSSSOMultipleProvidersSelectState
       setState(() {
         _isLoading = false;
       });
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not add providers',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Save Provider Configuration',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -145,14 +146,27 @@ class _SettingsAWSSSOMultipleProvidersSelectState
       },
       actionText: 'Add Providers',
       actionPressed: () {
-        _addProviders(context);
+        _addProviders();
       },
       actionIsLoading: _isLoading,
-      child: ListView(
-        children: [
-          ...List.generate(
-            widget.accounts.length,
-            (accountIndex) {
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.only(
+            top: Constants.spacingMiddle,
+            bottom: Constants.spacingMiddle,
+            left: Constants.spacingMiddle,
+            right: Constants.spacingMiddle,
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            separatorBuilder: (context, index) {
+              return const SizedBox(
+                height: Constants.spacingMiddle,
+              );
+            },
+            itemCount: widget.accounts.length,
+            itemBuilder: (context, accountIndex) {
               return Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,107 +183,106 @@ class _SettingsAWSSSOMultipleProvidersSelectState
                       style: primaryTextStyle(context),
                     ),
                   ),
-                  ListView(
+                  ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      ...List.generate(
-                        widget.accounts[accountIndex].roles?.length ?? 0,
-                        (roleIndex) {
-                          return Container(
-                            margin: const EdgeInsets.only(
-                              top: Constants.spacingSmall,
-                              bottom: Constants.spacingSmall,
-                              left: Constants.spacingExtraSmall,
-                              right: Constants.spacingExtraSmall,
+                    separatorBuilder: (context, index) {
+                      return const SizedBox(
+                        height: Constants.spacingMiddle,
+                      );
+                    },
+                    itemCount: widget.accounts[accountIndex].roles?.length ?? 0,
+                    itemBuilder: (context, roleIndex) {
+                      return Container(
+                        decoration: BoxDecoration(
+                          boxShadow: [
+                            BoxShadow(
+                              color: Theme.of(context)
+                                  .extension<CustomColors>()!
+                                  .shadow,
+                              blurRadius: Constants.sizeBorderBlurRadius,
+                              spreadRadius: Constants.sizeBorderSpreadRadius,
+                              offset: const Offset(0.0, 0.0),
                             ),
-                            decoration: BoxDecoration(
-                              boxShadow: [
-                                BoxShadow(
-                                  color: theme(context).colorShadow,
-                                  blurRadius: Constants.sizeBorderBlurRadius,
-                                  spreadRadius:
-                                      Constants.sizeBorderSpreadRadius,
-                                  offset: const Offset(0.0, 0.0),
-                                ),
-                              ],
-                              color: theme(context).colorCard,
-                              borderRadius: const BorderRadius.all(
-                                Radius.circular(Constants.sizeBorderRadius),
-                              ),
-                            ),
-                            child: CheckboxListTile(
-                              checkColor: Colors.white,
-                              activeColor: theme(context).colorPrimary,
-                              controlAffinity: ListTileControlAffinity.leading,
-                              value: _selectedAccounts
-                                      .where((a) =>
-                                          a.accountId ==
+                          ],
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(Constants.sizeBorderRadius),
+                          ),
+                        ),
+                        child: CheckboxListTile(
+                          controlAffinity: ListTileControlAffinity.leading,
+                          value: _selectedAccounts
+                                  .where(
+                                    (a) =>
+                                        a.accountId ==
+                                            widget.accounts[accountIndex]
+                                                .accountId &&
+                                        a.role ==
+                                            widget.accounts[accountIndex]
+                                                .roles![roleIndex],
+                                  )
+                                  .toList()
+                                  .length ==
+                              1,
+                          onChanged: (bool? value) {
+                            if (value == true) {
+                              setState(() {
+                                _selectedAccounts.add(
+                                  SelectedAWSSSOAccount(
+                                    accountId:
+                                        widget.accounts[accountIndex].accountId,
+                                    accountName: widget
+                                        .accounts[accountIndex].accountName,
+                                    role: widget.accounts[accountIndex]
+                                        .roles![roleIndex],
+                                    accessToken: widget
+                                        .accounts[accountIndex].accessToken,
+                                    accessTokenExpire: widget
+                                        .accounts[accountIndex]
+                                        .accessTokenExpire,
+                                  ),
+                                );
+                              });
+                            }
+                            if (value == false) {
+                              setState(() {
+                                _selectedAccounts = _selectedAccounts
+                                    .where(
+                                      (a) => !(a.accountId ==
                                               widget.accounts[accountIndex]
                                                   .accountId &&
                                           a.role ==
                                               widget.accounts[accountIndex]
-                                                  .roles![roleIndex])
-                                      .toList()
-                                      .length ==
-                                  1,
-                              onChanged: (bool? value) {
-                                if (value == true) {
-                                  setState(() {
-                                    _selectedAccounts.add(
-                                      SelectedAWSSSOAccount(
-                                        accountId: widget
-                                            .accounts[accountIndex].accountId,
-                                        accountName: widget
-                                            .accounts[accountIndex].accountName,
-                                        role: widget.accounts[accountIndex]
-                                            .roles![roleIndex],
-                                        accessToken: widget
-                                            .accounts[accountIndex].accessToken,
-                                        accessTokenExpire: widget
-                                            .accounts[accountIndex]
-                                            .accessTokenExpire,
-                                      ),
-                                    );
-                                  });
-                                }
-                                if (value == false) {
-                                  setState(() {
-                                    _selectedAccounts = _selectedAccounts
-                                        .where((a) => !(a.accountId ==
-                                                widget.accounts[accountIndex]
-                                                    .accountId &&
-                                            a.role ==
-                                                widget.accounts[accountIndex]
-                                                    .roles![roleIndex]))
-                                        .toList();
-                                  });
-                                }
-                              },
-                              title: Text(
-                                Characters(
-                                  widget
-                                      .accounts[accountIndex].roles![roleIndex],
+                                                  .roles![roleIndex]),
+                                    )
+                                    .toList();
+                              });
+                            }
+                          },
+                          title: Text(
+                            Characters(
+                              widget.accounts[accountIndex].roles![roleIndex],
+                            )
+                                .replaceAll(
+                                  Characters(''),
+                                  Characters('\u{200B}'),
                                 )
-                                    .replaceAll(
-                                        Characters(''), Characters('\u{200B}'))
-                                    .toString(),
-                                style: noramlTextStyle(
-                                  context,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                                .toString(),
+                            style: noramlTextStyle(
+                              context,
                             ),
-                          );
-                        },
-                      ),
-                    ],
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               );
             },
           ),
-        ],
+        ),
       ),
     );
   }

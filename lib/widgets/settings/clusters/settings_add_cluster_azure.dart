@@ -4,12 +4,12 @@ import 'package:provider/provider.dart';
 
 import 'package:kubenav/models/cluster_provider.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/services/providers/azure_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/logger.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/shared/app_bottom_sheet_widget.dart';
 import 'package:kubenav/widgets/shared/app_error_widget.dart';
 
@@ -62,7 +62,7 @@ class _SettingsAddClusterAzureState extends State<SettingsAddClusterAzure> {
 
         Logger.log(
           'SettingsAddClusterAzure _getClusters',
-          'Clusters were returned',
+          'Clusters',
           tmpClusters,
         );
         setState(() {
@@ -72,13 +72,13 @@ class _SettingsAddClusterAzureState extends State<SettingsAddClusterAzure> {
       } else {
         setState(() {
           _isLoading = false;
-          _error = 'Provider configuration is invalid';
+          _error = 'Provider Configuration is Invalid';
         });
       }
     } catch (err) {
       Logger.log(
         'SettingsAddClusterAzure _getClusters',
-        'Could not get clusters',
+        'Failed to Get Clusters',
         err,
       );
       setState(() {
@@ -90,7 +90,7 @@ class _SettingsAddClusterAzureState extends State<SettingsAddClusterAzure> {
 
   /// [_addClusters] adds all the users [_selectedClusters] to the app. If we
   /// can not add a cluster we show a snackbar with the error.
-  Future<void> _addClusters(BuildContext context) async {
+  Future<void> _addClusters() async {
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: false,
@@ -123,12 +123,13 @@ class _SettingsAddClusterAzureState extends State<SettingsAddClusterAzure> {
       setState(() {
         _isLoadingAddCluster = false;
       });
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not add clusters',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Add Clusters',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -138,106 +139,77 @@ class _SettingsAddClusterAzureState extends State<SettingsAddClusterAzure> {
   /// can select the clusters he wants to add to the app.
   Widget _buildContent() {
     if (_isLoading) {
-      return Flex(
-        direction: Axis.vertical,
-        children: [
-          Expanded(
-            child: Wrap(
-              children: [
-                CircularProgressIndicator(
-                  color: theme(context).colorPrimary,
-                ),
-              ],
-            ),
-          ),
-        ],
+      return CircularProgressIndicator(
+        color: Theme.of(context).colorScheme.primary,
       );
     }
 
     if (_error != '') {
-      return Flex(
-        direction: Axis.vertical,
-        children: [
-          Expanded(
-            child: Wrap(
-              children: [
-                AppErrorWidget(
-                  message: 'Could not load clusters',
-                  details: _error,
-                  icon: ClusterProviderType.azure.icon(),
-                ),
-              ],
-            ),
-          ),
-        ],
+      return AppErrorWidget(
+        message: 'Failed to Load Clusters',
+        details: _error,
+        icon: ClusterProviderType.azure.icon(),
       );
     }
 
-    return ListView(
-      children: [
-        ...List.generate(
-          _clusters.length,
-          (index) {
-            return Container(
-              margin: const EdgeInsets.only(
-                top: Constants.spacingSmall,
-                bottom: Constants.spacingSmall,
-                left: Constants.spacingExtraSmall,
-                right: Constants.spacingExtraSmall,
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      separatorBuilder: (context, index) {
+        return const SizedBox(
+          height: Constants.spacingMiddle,
+        );
+      },
+      itemCount: _clusters.length,
+      itemBuilder: (context, index) {
+        return Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(context).extension<CustomColors>()!.shadow,
+                blurRadius: Constants.sizeBorderBlurRadius,
+                spreadRadius: Constants.sizeBorderSpreadRadius,
+                offset: const Offset(0.0, 0.0),
               ),
-              decoration: BoxDecoration(
-                boxShadow: [
-                  BoxShadow(
-                    color: theme(context).colorShadow,
-                    blurRadius: Constants.sizeBorderBlurRadius,
-                    spreadRadius: Constants.sizeBorderSpreadRadius,
-                    offset: const Offset(0.0, 0.0),
-                  ),
-                ],
-                color: theme(context).colorCard,
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(Constants.sizeBorderRadius),
-                ),
+            ],
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.all(
+              Radius.circular(Constants.sizeBorderRadius),
+            ),
+          ),
+          child: CheckboxListTile(
+            controlAffinity: ListTileControlAffinity.leading,
+            value: _selectedClusters
+                    .where((c) => c.name == _clusters[index].name)
+                    .toList()
+                    .length ==
+                1,
+            onChanged: (bool? value) {
+              if (value == true) {
+                setState(() {
+                  _selectedClusters.add(_clusters[index]);
+                });
+              }
+              if (value == false) {
+                setState(() {
+                  _selectedClusters = _selectedClusters
+                      .where((c) => c.name != _clusters[index].name)
+                      .toList();
+                });
+              }
+            },
+            title: Text(
+              Characters(
+                _clusters[index].name ?? '',
+              ).replaceAll(Characters(''), Characters('\u{200B}')).toString(),
+              style: noramlTextStyle(
+                context,
               ),
-              child: CheckboxListTile(
-                checkColor: Colors.white,
-                activeColor: theme(context).colorPrimary,
-                controlAffinity: ListTileControlAffinity.leading,
-                value: _selectedClusters
-                        .where((c) => c.name == _clusters[index].name)
-                        .toList()
-                        .length ==
-                    1,
-                onChanged: (bool? value) {
-                  if (value == true) {
-                    setState(() {
-                      _selectedClusters.add(_clusters[index]);
-                    });
-                  }
-                  if (value == false) {
-                    setState(() {
-                      _selectedClusters = _selectedClusters
-                          .where((c) => c.name != _clusters[index].name)
-                          .toList();
-                    });
-                  }
-                },
-                title: Text(
-                  Characters(
-                    _clusters[index].name ?? '',
-                  )
-                      .replaceAll(Characters(''), Characters('\u{200B}'))
-                      .toString(),
-                  style: noramlTextStyle(
-                    context,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            );
-          },
-        ),
-      ],
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -258,10 +230,20 @@ class _SettingsAddClusterAzureState extends State<SettingsAddClusterAzure> {
       },
       actionText: 'Add Clusters',
       actionPressed: () {
-        _addClusters(context);
+        _addClusters();
       },
       actionIsLoading: _isLoading || _isLoadingAddCluster,
-      child: _buildContent(),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.only(
+            top: Constants.spacingMiddle,
+            bottom: Constants.spacingMiddle,
+            left: Constants.spacingMiddle,
+            right: Constants.spacingMiddle,
+          ),
+          child: _buildContent(),
+        ),
+      ),
     );
   }
 }

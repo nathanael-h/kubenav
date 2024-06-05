@@ -5,12 +5,15 @@ import 'package:provider/provider.dart';
 import 'package:kubenav/models/cluster.dart';
 import 'package:kubenav/models/cluster_provider.dart';
 import 'package:kubenav/repositories/app_repository.dart';
+import 'package:kubenav/repositories/bookmarks_repository.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/services/kubernetes_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/logger.dart';
+import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
+import 'package:kubenav/widgets/settings/clusters/settings_edit_cluster.dart';
 import 'package:kubenav/widgets/shared/app_list_item.dart';
 
 /// The [SettingsClusterItem] widget is used to display a single cluster in the
@@ -22,15 +25,17 @@ class SettingsClusterItem extends StatefulWidget {
     required this.index,
     required this.cluster,
     required this.isActiveCluster,
+    required this.isSortable,
     this.onTap,
-    this.onDoubleTap,
+    this.onLongPress,
   });
 
   final int index;
   final Cluster cluster;
   final bool isActiveCluster;
+  final bool isSortable;
   final void Function()? onTap;
-  final void Function()? onDoubleTap;
+  final void Function()? onLongPress;
 
   @override
   State<SettingsClusterItem> createState() => _SettingsClusterItemState();
@@ -65,7 +70,7 @@ class _SettingsClusterItemState extends State<SettingsClusterItem> {
       ).checkHealth();
       Logger.log(
         'SettingsClusterItem getClusterStatus',
-        'Cluster status was returned successfully',
+        'Cluster Status',
         result,
       );
       setState(() {
@@ -74,13 +79,41 @@ class _SettingsClusterItemState extends State<SettingsClusterItem> {
     } catch (err) {
       Logger.log(
         'SettingsClusterItem getClusterStatus',
-        'There was an error while returning the cluster status',
+        'Failed to Get Cluster Status',
         err,
       );
       setState(() {
         statusOk = false;
       });
     }
+  }
+
+  /// [_buildIcon] returns an icon widget, which indicates the status of the
+  /// cluster. If the [sort] argument is `true`, we return a drag handle icon,
+  /// which can be used to reorder the clusters.
+  Widget _buildIcon() {
+    if (widget.isSortable) {
+      return ReorderableDragStartListener(
+        index: widget.index,
+        child: Icon(
+          Icons.drag_handle,
+          color: Theme.of(context)
+              .extension<CustomColors>()!
+              .textPrimary
+              .withOpacity(Constants.opacityIcon),
+        ),
+      );
+    }
+
+    return Icon(
+      widget.isActiveCluster
+          ? Icons.radio_button_checked
+          : Icons.radio_button_unchecked,
+      size: 24,
+      color: statusOk
+          ? Theme.of(context).extension<CustomColors>()!.success
+          : Theme.of(context).extension<CustomColors>()!.error,
+    );
   }
 
   @override
@@ -93,14 +126,66 @@ class _SettingsClusterItemState extends State<SettingsClusterItem> {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(
-        top: Constants.spacingSmall,
-        bottom: Constants.spacingSmall,
+        bottom: Constants.spacingMiddle,
         left: Constants.spacingMiddle,
         right: Constants.spacingMiddle,
       ),
       child: AppListItem(
         onTap: widget.onTap,
-        onDoubleTap: widget.onDoubleTap,
+        onLongPress: widget.onLongPress,
+        slidableActions: [
+          AppListItemSlidableAction(
+            icon: Icons.edit,
+            label: 'Edit',
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            onTap: (BuildContext context) {
+              showModal(
+                context,
+                SettingsEditCluster(cluster: widget.cluster),
+              );
+            },
+          ),
+          AppListItemSlidableAction(
+            icon: Icons.delete,
+            label: 'Delete',
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
+            onTap: (BuildContext context) async {
+              ClustersRepository clustersRepository =
+                  Provider.of<ClustersRepository>(
+                context,
+                listen: false,
+              );
+              BookmarksRepository bookmarksRepository =
+                  Provider.of<BookmarksRepository>(
+                context,
+                listen: false,
+              );
+
+              try {
+                await clustersRepository.deleteCluster(widget.cluster.id);
+                await bookmarksRepository
+                    .removeBookmarksForCluster(widget.cluster.id);
+                if (context.mounted) {
+                  showSnackbar(
+                    context,
+                    'Cluster Deleted',
+                    'The cluster ${widget.cluster.name} was deleted',
+                  );
+                }
+              } catch (err) {
+                if (context.mounted) {
+                  showSnackbar(
+                    context,
+                    'Failed to Delete Cluster',
+                    err.toString(),
+                  );
+                }
+              }
+            },
+          ),
+        ],
         child: Column(
           children: [
             Row(
@@ -113,7 +198,10 @@ class _SettingsClusterItemState extends State<SettingsClusterItem> {
                     children: [
                       Text(
                         Characters(widget.cluster.name)
-                            .replaceAll(Characters(''), Characters('\u{200B}'))
+                            .replaceAll(
+                              Characters(''),
+                              Characters('\u{200B}'),
+                            )
                             .toString(),
                         style: primaryTextStyle(
                           context,
@@ -137,18 +225,7 @@ class _SettingsClusterItemState extends State<SettingsClusterItem> {
                     ],
                   ),
                 ),
-                ReorderableDragStartListener(
-                  index: widget.index,
-                  child: Icon(
-                    widget.isActiveCluster
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    size: 24,
-                    color: statusOk
-                        ? theme(context).colorSuccess
-                        : theme(context).colorDanger,
-                  ),
-                ),
+                _buildIcon(),
               ],
             ),
           ],

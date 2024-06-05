@@ -5,17 +5,17 @@ import 'package:provider/provider.dart';
 import 'package:kubenav/models/plugins/helm.dart';
 import 'package:kubenav/repositories/app_repository.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/services/kubernetes_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/custom_icons.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/navigate.dart';
-import 'package:kubenav/utils/resources/general.dart';
+import 'package:kubenav/utils/resources.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/plugins/helm/plugin_helm_details.dart';
+import 'package:kubenav/widgets/plugins/helm/plugin_helm_list_item_actions.dart';
 import 'package:kubenav/widgets/shared/app_bottom_navigation_bar_widget.dart';
-import 'package:kubenav/widgets/shared/app_drawer.dart';
 import 'package:kubenav/widgets/shared/app_error_widget.dart';
 import 'package:kubenav/widgets/shared/app_floating_action_buttons_widget.dart';
 import 'package:kubenav/widgets/shared/app_list_item.dart';
@@ -60,13 +60,13 @@ class _PluginHelmListState extends State<PluginHelmList> {
       cluster: cluster!,
       proxy: appRepository.settings.proxy,
       timeout: appRepository.settings.timeout,
-    ).helmListCharts(cluster.namespace);
+    ).helmListReleases(cluster.namespace);
   }
 
   /// [_buildItem] builds the widget for a single Helm release shown in the list
   /// of releases. When the user clicks on the release he will be redirected to
   /// the [PluginHelmDetails] screen.
-  Widget _buildItem(BuildContext context, Release release) {
+  Widget _buildItem(Release release) {
     return AppListItem(
       onTap: () {
         navigate(
@@ -78,6 +78,32 @@ class _PluginHelmListState extends State<PluginHelmList> {
           ),
         );
       },
+      onLongPress: () {
+        hapticFeedback();
+
+        showActions(
+          context,
+          PluginHelmListItemActions(
+            release: release,
+          ),
+        );
+      },
+      slidableActions: [
+        AppListItemSlidableAction(
+          icon: Icons.more_horiz,
+          label: 'More',
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          onTap: (BuildContext context) {
+            showActions(
+              context,
+              PluginHelmListItemActions(
+                release: release,
+              ),
+            );
+          },
+        ),
+      ],
       child: Row(
         children: [
           Expanded(
@@ -121,7 +147,8 @@ class _PluginHelmListState extends State<PluginHelmList> {
                     ),
                     Text(
                       Characters(
-                              'Updated: ${formatTime(DateTime.parse(release.info?.lastDeployed ?? ''))}')
+                        'Updated: ${formatTime(DateTime.parse(release.info?.lastDeployed ?? '-'))}',
+                      )
                           .replaceAll(Characters(''), Characters('\u{200B}'))
                           .toString(),
                       overflow: TextOverflow.ellipsis,
@@ -131,17 +158,7 @@ class _PluginHelmListState extends State<PluginHelmList> {
                       ),
                     ),
                     Text(
-                      Characters('Status: ${release.info?.status}')
-                          .replaceAll(Characters(''), Characters('\u{200B}'))
-                          .toString(),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: secondaryTextStyle(
-                        context,
-                      ),
-                    ),
-                    Text(
-                      Characters('Chart: ${release.chart?.metadata?.version}')
+                      Characters('Status: ${release.info?.status ?? '-'}')
                           .replaceAll(Characters(''), Characters('\u{200B}'))
                           .toString(),
                       overflow: TextOverflow.ellipsis,
@@ -152,7 +169,20 @@ class _PluginHelmListState extends State<PluginHelmList> {
                     ),
                     Text(
                       Characters(
-                              'App Version: ${release.chart?.metadata?.appVersion}')
+                        'Chart Version: ${release.chart?.metadata?.version ?? '-'}',
+                      )
+                          .replaceAll(Characters(''), Characters('\u{200B}'))
+                          .toString(),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: secondaryTextStyle(
+                        context,
+                      ),
+                    ),
+                    Text(
+                      Characters(
+                        'App Version: ${release.chart?.metadata?.appVersion ?? '-'}',
+                      )
                           .replaceAll(Characters(''), Characters('\u{200B}'))
                           .toString(),
                       overflow: TextOverflow.ellipsis,
@@ -166,37 +196,25 @@ class _PluginHelmListState extends State<PluginHelmList> {
               ],
             ),
           ),
+          Wrap(
+            children: [
+              const SizedBox(width: Constants.spacingSmall),
+              Icon(
+                Icons.radio_button_checked,
+                size: 24,
+                color: release.info?.status == 'deployed' ||
+                        release.info?.status == 'superseded' ||
+                        release.info?.status == 'uninstalled'
+                    ? Theme.of(context).extension<CustomColors>()!.success
+                    : release.info?.status == 'failed'
+                        ? Theme.of(context).extension<CustomColors>()!.error
+                        : Theme.of(context).extension<CustomColors>()!.warning,
+              ),
+            ],
+          ),
         ],
       ),
     );
-  }
-
-  /// [_buildHeaderActions] returns the Helm list actions as header when the
-  /// user didn't opt in for the classic mode.
-  Widget _buildHeaderActions(BuildContext context) {
-    AppRepository appRepository = Provider.of<AppRepository>(
-      context,
-      listen: false,
-    );
-
-    if (!appRepository.settings.classicMode) {
-      return AppResourceActions(
-        mode: AppResourceActionsMode.header,
-        actions: [
-          AppResourceActionsModel(
-            title: 'Refresh',
-            icon: Icons.refresh,
-            onTap: () {
-              setState(() {
-                _futureFetchHelmReleases = _fetchHelmReleases();
-              });
-            },
-          ),
-        ],
-      );
-    }
-
-    return Container();
   }
 
   @override
@@ -209,11 +227,7 @@ class _PluginHelmListState extends State<PluginHelmList> {
 
   @override
   Widget build(BuildContext context) {
-    Provider.of<ThemeRepository>(
-      context,
-      listen: true,
-    );
-    AppRepository appRepository = Provider.of<AppRepository>(
+    Provider.of<AppRepository>(
       context,
       listen: true,
     );
@@ -223,45 +237,16 @@ class _PluginHelmListState extends State<PluginHelmList> {
     );
 
     return Scaffold(
-      drawer: appRepository.settings.classicMode ? const AppDrawer() : null,
       appBar: AppBar(
         centerTitle: true,
-
-        /// If the user opt in for the classic mode, we show the actions for the
-        /// Helm list view in the [AppBar] next to the namespace selection. If a
-        /// user does not use this mode we only show the namespace selection
-        /// action.
-        actions: appRepository.settings.classicMode
-            ? [
-                IconButton(
-                  icon: const Icon(CustomIcons.namespaces),
-                  onPressed: () {
-                    showModal(context, const AppNamespacesWidget());
-                  },
-                ),
-                AppResourceActions(
-                  mode: AppResourceActionsMode.menu,
-                  actions: [
-                    AppResourceActionsModel(
-                      title: 'Refresh',
-                      icon: Icons.refresh,
-                      onTap: () {
-                        setState(() {
-                          _futureFetchHelmReleases = _fetchHelmReleases();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ]
-            : [
-                IconButton(
-                  icon: const Icon(CustomIcons.namespaces),
-                  onPressed: () {
-                    showModal(context, const AppNamespacesWidget());
-                  },
-                ),
-              ],
+        actions: [
+          IconButton(
+            icon: const Icon(CustomIcons.namespaces),
+            onPressed: () {
+              showModal(context, const AppNamespacesWidget());
+            },
+          ),
+        ],
         title: Column(
           children: [
             Text(
@@ -276,20 +261,20 @@ class _PluginHelmListState extends State<PluginHelmList> {
               ),
             ),
             Text(
-              Characters(clustersRepository
-                              .getCluster(
-                                clustersRepository.activeClusterId,
-                              )!
-                              .namespace ==
-                          ''
-                      ? 'All Namespaces'
-                      : clustersRepository
-                          .getCluster(
-                            clustersRepository.activeClusterId,
-                          )!
-                          .namespace)
-                  .replaceAll(Characters(''), Characters('\u{200B}'))
-                  .toString(),
+              Characters(
+                clustersRepository
+                            .getCluster(
+                              clustersRepository.activeClusterId,
+                            )!
+                            .namespace ==
+                        ''
+                    ? 'All Namespaces'
+                    : clustersRepository
+                        .getCluster(
+                          clustersRepository.activeClusterId,
+                        )!
+                        .namespace,
+              ).replaceAll(Characters(''), Characters('\u{200B}')).toString(),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 14,
@@ -300,9 +285,7 @@ class _PluginHelmListState extends State<PluginHelmList> {
           ],
         ),
       ),
-      bottomNavigationBar: appRepository.settings.classicMode
-          ? null
-          : const AppBottomNavigationBarWidget(),
+      bottomNavigationBar: const AppBottomNavigationBarWidget(),
       floatingActionButton: const AppFloatingActionButtonsWidget(),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -322,10 +305,11 @@ class _PluginHelmListState extends State<PluginHelmList> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Padding(
-                            padding:
-                                const EdgeInsets.all(Constants.spacingMiddle),
+                            padding: const EdgeInsets.all(
+                              Constants.spacingMiddle,
+                            ),
                             child: CircularProgressIndicator(
-                              color: theme(context).colorPrimary,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
                         ],
@@ -339,9 +323,10 @@ class _PluginHelmListState extends State<PluginHelmList> {
                             Flexible(
                               child: Padding(
                                 padding: const EdgeInsets.all(
-                                    Constants.spacingMiddle),
+                                  Constants.spacingMiddle,
+                                ),
                                 child: AppErrorWidget(
-                                  message: 'Could not load Helm charts',
+                                  message: 'Failed to Load Helm Releases',
                                   details: snapshot.error.toString(),
                                   icon: 'assets/plugins/helm.svg',
                                 ),
@@ -353,7 +338,21 @@ class _PluginHelmListState extends State<PluginHelmList> {
 
                       return Wrap(
                         children: [
-                          _buildHeaderActions(context),
+                          AppResourceActions(
+                            mode: AppResourceActionsMode.header,
+                            actions: [
+                              AppResourceActionsModel(
+                                title: 'Refresh',
+                                icon: Icons.refresh,
+                                onTap: () {
+                                  setState(() {
+                                    _futureFetchHelmReleases =
+                                        _fetchHelmReleases();
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
                           Container(
                             padding: const EdgeInsets.only(
                               top: Constants.spacingMiddle,
@@ -372,10 +371,7 @@ class _PluginHelmListState extends State<PluginHelmList> {
                               ),
                               itemCount: snapshot.data!.length,
                               itemBuilder: (context, index) {
-                                return _buildItem(
-                                  context,
-                                  snapshot.data![index],
-                                );
+                                return _buildItem(snapshot.data![index]);
                               },
                             ),
                           ),

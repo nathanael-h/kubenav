@@ -3,12 +3,15 @@
 //
 // @dart=2.12
 
+// ignore_for_file: require_trailing_commas
 // ignore_for_file: unused_element
 // ignore_for_file: unnecessary_this
 // ignore_for_file: always_put_required_named_parameters_first
 // ignore_for_file: constant_identifier_names
 // ignore_for_file: lines_longer_than_80_chars
 // ignore_for_file: avoid_function_literals_in_foreach_calls
+
+import 'package:collection/collection.dart';
 
 const _delimiters = {'csv': ',', 'ssv': ' ', 'tsv': '\t', 'pipes': '|'};
 const _dateEpochMarker = 'epoch';
@@ -48,3 +51,5 @@ DateTime? mapDateTime(dynamic map, String key, [String? pattern]) {
   }
   return null;
 }
+
+const deepEquality = DeepCollectionEquality();

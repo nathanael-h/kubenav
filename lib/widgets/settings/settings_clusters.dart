@@ -1,13 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
 
 import 'package:kubenav/models/cluster_provider.dart';
-import 'package:kubenav/repositories/app_repository.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/showmodal.dart';
@@ -17,7 +13,6 @@ import 'package:kubenav/widgets/settings/clusters/settings_cluster_actions.dart'
 import 'package:kubenav/widgets/settings/clusters/settings_cluster_item.dart';
 import 'package:kubenav/widgets/settings/clusters/settings_reuse_provider_config_actions.dart';
 import 'package:kubenav/widgets/shared/app_bottom_navigation_bar_widget.dart';
-import 'package:kubenav/widgets/shared/app_drawer.dart';
 import 'package:kubenav/widgets/shared/app_floating_action_buttons_widget.dart';
 import 'package:kubenav/widgets/shared/app_horizontal_list_cards_widget.dart';
 
@@ -28,22 +23,42 @@ import 'package:kubenav/widgets/shared/app_horizontal_list_cards_widget.dart';
 /// Below the list of providers we display the users added clusters. We also add
 /// the status to each cluster item, so a user sees if we are able to reach the
 /// cluster.
-class SettingsClusters extends StatelessWidget {
+class SettingsClusters extends StatefulWidget {
   const SettingsClusters({super.key});
 
-  /// [_proxyDecorator] is used to highlight the cluster which is currently
+  @override
+  State<SettingsClusters> createState() => _SettingsClustersState();
+}
+
+class _SettingsClustersState extends State<SettingsClusters> {
+  bool isSortable = false;
+
+  /// [_proxyDecorator] is used to highlight the bookmark which is currently
   /// draged by the user.
-  Widget _proxyDecorator(BuildContext context, Widget child, int index,
-      Animation<double> animation) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (BuildContext context, Widget? child) {
-        return Material(
-          elevation: 0,
-          child: child,
-        );
-      },
-      child: child,
+  Widget _proxyDecorator(
+    Widget child,
+    int index,
+    Animation<double> animation,
+  ) {
+    return Material(
+      elevation: 0,
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 16,
+            child: Material(
+              borderRadius: BorderRadius.circular(16),
+              elevation: 24,
+              color: Colors.transparent,
+            ),
+          ),
+          child,
+        ],
+      ),
     );
   }
 
@@ -83,70 +98,52 @@ class SettingsClusters extends StatelessWidget {
   /// [buildProviders] is used to display a list with all providers. When the
   /// user clicks on one of the shown providers, we display a modal bottom
   /// sheet, which can be used to add a cluster using the selected provider.
-  ///
-  /// This widget is only displayed on iOS and Android, because we automatically
-  /// add all clusters from the users Kubeconfig file in "~/.kube/config" in the
-  /// desktop version.
   Widget buildProviders(BuildContext context) {
-    if (Platform.isAndroid || Platform.isIOS) {
-      return AppHorizontalListCardsWidget(
-        title: 'Add Cluster',
-        cards: List.generate(
-          ClusterProviderType.values.length,
-          (index) => AppHorizontalListCardsModel(
-            title: ClusterProviderType.values[index].title(),
-            subtitle: [ClusterProviderType.values[index].subtitle()],
-            image: ClusterProviderType.values[index].icon(),
-            onTap: () {
-              _showAddClusterBottomSheet(
-                context,
-                ClusterProviderType.values[index],
-              );
-            },
-          ),
+    return AppHorizontalListCardsWidget(
+      title: 'Add Cluster',
+      cards: List.generate(
+        ClusterProviderType.values.length,
+        (index) => AppHorizontalListCardsModel(
+          title: ClusterProviderType.values[index].title(),
+          subtitle: [ClusterProviderType.values[index].subtitle()],
+          image: ClusterProviderType.values[index].icon(),
+          onTap: () {
+            _showAddClusterBottomSheet(
+              context,
+              ClusterProviderType.values[index],
+            );
+          },
         ),
-      );
-    }
-
-    return Container();
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    Provider.of<ThemeRepository>(
-      context,
-      listen: true,
-    );
-    AppRepository appRepository = Provider.of<AppRepository>(
-      context,
-      listen: true,
-    );
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: true,
     );
 
     return Scaffold(
-      drawer: appRepository.settings.classicMode ? const AppDrawer() : null,
       appBar: AppBar(
         centerTitle: true,
         title: const Text('Clusters'),
       ),
-      bottomNavigationBar: appRepository.settings.classicMode
-          ? null
-          : const AppBottomNavigationBarWidget(),
+      bottomNavigationBar: const AppBottomNavigationBarWidget(),
       floatingActionButton: const AppFloatingActionButtonsWidget(),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
-              const SizedBox(height: Constants.spacingSmall),
-
               buildProviders(context),
 
               Padding(
-                padding: const EdgeInsets.all(
-                  Constants.spacingMiddle,
+                padding: const EdgeInsets.only(
+                  top: Constants.spacingExtraLarge,
+                  bottom: Constants.spacingMiddle,
+                  left: Constants.spacingMiddle,
+                  right: Constants.spacingMiddle,
                 ),
                 child: Row(
                   children: [
@@ -154,6 +151,30 @@ class SettingsClusters extends StatelessWidget {
                       child: Text(
                         'Clusters',
                         style: primaryTextStyle(context, size: 18),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          isSortable = !isSortable;
+                        });
+                      },
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.sort,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 16,
+                          ),
+                          const SizedBox(width: Constants.spacingExtraSmall),
+                          Text(
+                            'Sort',
+                            style: secondaryTextStyle(
+                              context,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -171,9 +192,13 @@ class SettingsClusters extends StatelessWidget {
                 onReorder: (int start, int current) {
                   clustersRepository.reorderClusters(start, current);
                 },
-                proxyDecorator:
-                    (Widget child, int index, Animation<double> animation) =>
-                        _proxyDecorator(context, child, index, animation),
+                proxyDecorator: (
+                  Widget child,
+                  int index,
+                  Animation<double> animation,
+                ) {
+                  return _proxyDecorator(child, index, animation);
+                },
                 itemCount: clustersRepository.clusters.length,
                 itemBuilder: (
                   context,
@@ -189,24 +214,30 @@ class SettingsClusters extends StatelessWidget {
                       cluster: clustersRepository.clusters[index],
                       isActiveCluster: clustersRepository.clusters[index].id ==
                           clustersRepository.activeClusterId,
-                      onTap: () {
-                        clustersRepository.setActiveCluster(
-                          clustersRepository.clusters[index].id,
-                        );
-                      },
-                      onDoubleTap: () {
-                        showActions(
-                          context,
-                          SettingsClusterActions(
-                            cluster: clustersRepository.clusters[index],
-                          ),
-                        );
-                      },
+                      isSortable: isSortable,
+                      onTap: isSortable
+                          ? null
+                          : () {
+                              clustersRepository.setActiveCluster(
+                                clustersRepository.clusters[index].id,
+                              );
+                            },
+                      onLongPress: isSortable
+                          ? null
+                          : () {
+                              hapticFeedback();
+
+                              showActions(
+                                context,
+                                SettingsClusterActions(
+                                  cluster: clustersRepository.clusters[index],
+                                ),
+                              );
+                            },
                     ),
                   );
                 },
               ),
-              const SizedBox(height: Constants.spacingSmall),
             ],
           ),
         ),

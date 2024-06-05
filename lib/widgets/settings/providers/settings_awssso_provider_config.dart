@@ -5,12 +5,12 @@ import 'package:uuid/uuid.dart';
 
 import 'package:kubenav/models/cluster_provider.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/services/providers/aws_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/logger.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/settings/clusters/settings_add_cluster_awssso.dart';
 import 'package:kubenav/widgets/shared/app_bottom_sheet_widget.dart';
 
@@ -58,7 +58,7 @@ class _SettingsAWSSSOProviderState extends State<SettingsAWSSSOProvider> {
 
       Logger.log(
         'SettingsAWSSSOProvider _startSSOFlow',
-        'SSO config was returned',
+        'SSO Config',
         ssoConfig,
       );
       setState(() {
@@ -67,22 +67,23 @@ class _SettingsAWSSSOProviderState extends State<SettingsAWSSSOProvider> {
       if (mounted) {
         showSnackbar(
           context,
-          'Sing in completed',
+          'Sing in Completed',
           'You can now click on the verify button',
         );
       }
     } catch (err) {
       Logger.log(
         'SettingsAWSSSOProvider _startSSOFlow',
-        'Could not get SSO configuration',
+        'Failed to Get SSO Configuration',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not get SSO configuration',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Get SSO Configuration',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -95,19 +96,20 @@ class _SettingsAWSSSOProviderState extends State<SettingsAWSSSOProvider> {
     } catch (err) {
       Logger.log(
         'SettingsAWSSSOProvider _verifyDevice',
-        'Could not verify device',
+        'Failed to Verify Device',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not verify device',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Verify Device',
+          err.toString(),
+        );
+      }
     }
   }
 
-  void _getSSOCredentials() async {
+  Future<void> _getSSOCredentials() async {
     try {
       final ssoCredentials = await AWSService().getSSOToken(
         _accountIDController.text,
@@ -122,7 +124,7 @@ class _SettingsAWSSSOProviderState extends State<SettingsAWSSSOProvider> {
 
       Logger.log(
         'SettingsAWSSSOProvider _getSSOCredentials',
-        'SSO config was returned',
+        'SSO Config was returned',
         ssoCredentials,
       );
       setState(() {
@@ -131,26 +133,27 @@ class _SettingsAWSSSOProviderState extends State<SettingsAWSSSOProvider> {
       if (mounted) {
         showSnackbar(
           context,
-          'Credentials are created',
+          'Credentials Created',
           'You can now click on the save button',
         );
       }
     } catch (err) {
       Logger.log(
         'SettingsAWSSSOProvider _getSSOCredentials',
-        'Could not get SSO credentials',
+        'Failed to Get SSO Credentials',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not get SSO credentials',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Get SSO Credentials',
+          err.toString(),
+        );
+      }
     }
   }
 
-  Future<void> _saveProvider(BuildContext context) async {
+  Future<void> _saveProvider() async {
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: false,
@@ -215,12 +218,13 @@ class _SettingsAWSSSOProviderState extends State<SettingsAWSSSOProvider> {
       setState(() {
         _isLoading = false;
       });
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not add provider configuration',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Save Provider Configuration',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -255,235 +259,211 @@ class _SettingsAWSSSOProviderState extends State<SettingsAWSSSOProvider> {
       closePressed: () {
         Navigator.pop(context);
       },
-      actionText: widget.provider == null ? 'Save and add cluster(s)' : 'Save',
+      actionText: widget.provider == null ? 'Save and Add Cluster(s)' : 'Save',
       actionPressed: () {
-        _saveProvider(context);
+        _saveProvider();
       },
       actionIsLoading: _isLoading,
       child: Form(
         key: _providerConfigFormKey,
-        child: ListView(
-          shrinkWrap: false,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _nameController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Name',
-                ),
-                validator: _validator,
-              ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: Constants.spacingMiddle,
+              bottom: Constants.spacingMiddle,
+              left: Constants.spacingMiddle,
+              right: Constants.spacingMiddle,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _startURLController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Start URL',
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Name',
+                  ),
+                  validator: _validator,
                 ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _accountIDController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Account ID',
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _startURLController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Start URL',
+                  ),
+                  validator: _validator,
                 ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _roleNameController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Role Name',
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _accountIDController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Account ID',
+                  ),
+                  validator: _validator,
                 ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Text('SSO Region'),
-                  DropdownButton(
-                    value: _ssoRegion,
-                    underline: Container(
-                      height: 2,
-                      color: theme(context).colorPrimary,
-                    ),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _ssoRegion = newValue ?? '';
-                      });
-                    },
-                    items: awsRegions.map((value) {
-                      return DropdownMenuItem(
-                        value: value,
-                        child: Text(
-                          value,
-                          style: TextStyle(
-                            color: theme(context).colorTextPrimary,
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _roleNameController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Role Name',
+                  ),
+                  validator: _validator,
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('SSO Region'),
+                    DropdownButton(
+                      value: _ssoRegion,
+                      underline: Container(
+                        height: 2,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _ssoRegion = newValue ?? '';
+                        });
+                      },
+                      items: awsRegions.map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value,
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .extension<CustomColors>()!
+                                  .textPrimary,
+                            ),
                           ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Text('Region'),
-                  DropdownButton(
-                    value: _region,
-                    underline: Container(
-                      height: 2,
-                      color: theme(context).colorPrimary,
+                        );
+                      }).toList(),
                     ),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _region = newValue ?? '';
-                      });
-                    },
-                    items: awsRegions.map((value) {
-                      return DropdownMenuItem(
-                        value: value,
-                        child: Text(
-                          value,
-                          style: TextStyle(
-                            color: theme(context).colorTextPrimary,
+                  ],
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('Region'),
+                    DropdownButton(
+                      value: _region,
+                      underline: Container(
+                        height: 2,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _region = newValue ?? '';
+                        });
+                      },
+                      items: awsRegions.map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value,
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .extension<CustomColors>()!
+                                  .textPrimary,
+                            ),
                           ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme(context).colorPrimary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(40),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      Constants.sizeBorderRadius,
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size.fromHeight(40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        Constants.sizeBorderRadius,
+                      ),
                     ),
                   ),
-                ),
-                onPressed: _startSSOFlow,
-                child: Text(
-                  'Sign In',
-                  style: primaryTextStyle(
-                    context,
-                    color: Colors.white,
+                  onPressed: _startSSOFlow,
+                  child: Text(
+                    'Sign In',
+                    style: primaryTextStyle(
+                      context,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme(context).colorPrimary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(40),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      Constants.sizeBorderRadius,
+                const SizedBox(height: Constants.spacingMiddle),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size.fromHeight(40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        Constants.sizeBorderRadius,
+                      ),
                     ),
                   ),
-                ),
-                onPressed: _awsSSOConfig == null ? null : _verifyDevice,
-                child: Text(
-                  'Verify',
-                  style: primaryTextStyle(
-                    context,
-                    color: Colors.white,
+                  onPressed: _awsSSOConfig == null ? null : _verifyDevice,
+                  child: Text(
+                    'Verify',
+                    style: primaryTextStyle(
+                      context,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme(context).colorPrimary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(40),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      Constants.sizeBorderRadius,
+                const SizedBox(height: Constants.spacingMiddle),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size.fromHeight(40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        Constants.sizeBorderRadius,
+                      ),
                     ),
                   ),
-                ),
-                onPressed: _awsSSOConfig == null || !_verified
-                    ? null
-                    : _getSSOCredentials,
-                child: Text(
-                  'Get Credentials',
-                  style: primaryTextStyle(
-                    context,
-                    color: Colors.white,
+                  onPressed: _awsSSOConfig == null || !_verified
+                      ? null
+                      : _getSSOCredentials,
+                  child: Text(
+                    'Get Credentials',
+                    style: primaryTextStyle(
+                      context,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

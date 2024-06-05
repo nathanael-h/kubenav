@@ -6,18 +6,18 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 import 'package:kubenav/repositories/sponsor_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/custom_icons.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/logger.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/shared/app_bottom_sheet_widget.dart';
 import 'package:kubenav/widgets/shared/app_vertical_list_simple_widget.dart';
 
 const licenseText = '''MIT License
 
-Copyright (c) 2023 Rico Berger
+Copyright (c) 2024 Rico Berger
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -72,7 +72,7 @@ class _SettingsInfoState extends State<SettingsInfo> {
   /// [buildAdditionalLinks] returns additional links for iOS which must be
   /// present in the app so that the app is not rejected in the App Store
   /// submission.
-  List<AppVertialListSimpleModel> buildAdditionalLinks(BuildContext context) {
+  List<AppVerticalListSimpleModel> buildAdditionalLinks() {
     if (Platform.isIOS) {
       SponsorRepository sponsorRepository = Provider.of<SponsorRepository>(
         context,
@@ -80,7 +80,7 @@ class _SettingsInfoState extends State<SettingsInfo> {
       );
 
       return [
-        AppVertialListSimpleModel(
+        AppVerticalListSimpleModel(
           onTap: () {
             openUrl(
               'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/',
@@ -89,7 +89,7 @@ class _SettingsInfoState extends State<SettingsInfo> {
           children: [
             Icon(
               Icons.policy,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: Constants.spacingSmall),
             Expanded(
@@ -103,14 +103,15 @@ class _SettingsInfoState extends State<SettingsInfo> {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: theme(context)
-                  .colorTextPrimary
+              color: Theme.of(context)
+                  .extension<CustomColors>()!
+                  .textPrimary
                   .withOpacity(Constants.opacityIcon),
               size: 16,
             ),
           ],
         ),
-        AppVertialListSimpleModel(
+        AppVerticalListSimpleModel(
           onTap: () {
             sponsorRepository.restorePurchases();
             showSnackbar(
@@ -122,7 +123,7 @@ class _SettingsInfoState extends State<SettingsInfo> {
           children: [
             Icon(
               Icons.favorite,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: Constants.spacingSmall),
             Expanded(
@@ -136,8 +137,9 @@ class _SettingsInfoState extends State<SettingsInfo> {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: theme(context)
-                  .colorTextPrimary
+              color: Theme.of(context)
+                  .extension<CustomColors>()!
+                  .textPrimary
                   .withOpacity(Constants.opacityIcon),
               size: 16,
             ),
@@ -157,19 +159,14 @@ class _SettingsInfoState extends State<SettingsInfo> {
 
   @override
   Widget build(BuildContext context) {
-    Provider.of<ThemeRepository>(
-      context,
-      listen: true,
-    );
-
-    return AppVertialListSimpleWidget(
+    return AppVerticalListSimpleWidget(
       title: 'Info',
       items: [
-        AppVertialListSimpleModel(
+        AppVerticalListSimpleModel(
           children: [
             Icon(
               Icons.code,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: Constants.spacingSmall),
             Expanded(
@@ -189,7 +186,7 @@ class _SettingsInfoState extends State<SettingsInfo> {
                 right: 6,
               ),
               decoration: BoxDecoration(
-                color: theme(context).colorPrimary,
+                color: Theme.of(context).colorScheme.primary,
                 borderRadius: const BorderRadius.all(
                   Radius.circular(Constants.sizeBorderRadius),
                 ),
@@ -203,21 +200,21 @@ class _SettingsInfoState extends State<SettingsInfo> {
                 style: secondaryTextStyle(
                   context,
                   size: 14,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
             ),
           ],
         ),
-        AppVertialListSimpleModel(
+        AppVerticalListSimpleModel(
           onTap: () {
             openUrl('https://kubenav.io');
           },
           children: [
             Icon(
               Icons.language,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: Constants.spacingSmall),
             Expanded(
@@ -231,21 +228,22 @@ class _SettingsInfoState extends State<SettingsInfo> {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: theme(context)
-                  .colorTextPrimary
+              color: Theme.of(context)
+                  .extension<CustomColors>()!
+                  .textPrimary
                   .withOpacity(Constants.opacityIcon),
               size: 16,
             ),
           ],
         ),
-        AppVertialListSimpleModel(
+        AppVerticalListSimpleModel(
           onTap: () {
             openUrl('https://github.com/kubenav/kubenav');
           },
           children: [
             Icon(
               CustomIcons.github,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: Constants.spacingSmall),
             Expanded(
@@ -259,21 +257,22 @@ class _SettingsInfoState extends State<SettingsInfo> {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: theme(context)
-                  .colorTextPrimary
+              color: Theme.of(context)
+                  .extension<CustomColors>()!
+                  .textPrimary
                   .withOpacity(Constants.opacityIcon),
               size: 16,
             ),
           ],
         ),
-        AppVertialListSimpleModel(
+        AppVerticalListSimpleModel(
           onTap: () {
             openUrl('https://twitter.com/kubenav');
           },
           children: [
             Icon(
               CustomIcons.twitter,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: Constants.spacingSmall),
             Expanded(
@@ -287,14 +286,15 @@ class _SettingsInfoState extends State<SettingsInfo> {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: theme(context)
-                  .colorTextPrimary
+              color: Theme.of(context)
+                  .extension<CustomColors>()!
+                  .textPrimary
                   .withOpacity(Constants.opacityIcon),
               size: 16,
             ),
           ],
         ),
-        AppVertialListSimpleModel(
+        AppVerticalListSimpleModel(
           onTap: () {
             showModal(
               context,
@@ -310,23 +310,22 @@ class _SettingsInfoState extends State<SettingsInfo> {
                   Navigator.pop(context);
                 },
                 actionIsLoading: false,
-                child: Form(
-                  key: const Key('settings/license'),
-                  child: ListView(
-                    shrinkWrap: false,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 8,
-                        ),
-                        child: Text(
-                          licenseText,
-                          style: TextStyle(
-                            color: theme(context).colorTextPrimary,
-                          ),
-                        ),
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      top: Constants.spacingMiddle,
+                      bottom: Constants.spacingMiddle,
+                      left: Constants.spacingMiddle,
+                      right: Constants.spacingMiddle,
+                    ),
+                    child: Text(
+                      licenseText,
+                      style: TextStyle(
+                        color: Theme.of(context)
+                            .extension<CustomColors>()!
+                            .textPrimary,
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -335,7 +334,7 @@ class _SettingsInfoState extends State<SettingsInfo> {
           children: [
             Icon(
               Icons.copyright,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: Constants.spacingSmall),
             Expanded(
@@ -349,21 +348,22 @@ class _SettingsInfoState extends State<SettingsInfo> {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: theme(context)
-                  .colorTextPrimary
+              color: Theme.of(context)
+                  .extension<CustomColors>()!
+                  .textPrimary
                   .withOpacity(Constants.opacityIcon),
               size: 16,
             ),
           ],
         ),
-        AppVertialListSimpleModel(
+        AppVerticalListSimpleModel(
           onTap: () {
             openUrl('https://kubenav.io/privacy.html');
           },
           children: [
             Icon(
               Icons.policy,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: Constants.spacingSmall),
             Expanded(
@@ -377,14 +377,15 @@ class _SettingsInfoState extends State<SettingsInfo> {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: theme(context)
-                  .colorTextPrimary
+              color: Theme.of(context)
+                  .extension<CustomColors>()!
+                  .textPrimary
                   .withOpacity(Constants.opacityIcon),
               size: 16,
             ),
           ],
         ),
-        ...buildAdditionalLinks(context),
+        ...buildAdditionalLinks(),
       ],
     );
   }

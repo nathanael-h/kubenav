@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'package:kubenav/models/cluster_provider.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/services/providers/aws_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/logger.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/settings/providers/settings_awssso_multiple_providers_select.dart';
 import 'package:kubenav/widgets/shared/app_bottom_sheet_widget.dart';
 
@@ -47,7 +47,7 @@ class _SettingsAWSSSOMultipleProvidersState
 
       Logger.log(
         'SettingsAWSSSOMultipleProviders _startSSOFlow',
-        'SSO config was returned',
+        'SSO Config',
         ssoConfig,
       );
       setState(() {
@@ -56,22 +56,23 @@ class _SettingsAWSSSOMultipleProvidersState
       if (mounted) {
         showSnackbar(
           context,
-          'Sing in completed',
+          'Sing in Completed',
           'You can now click on the verify button',
         );
       }
     } catch (err) {
       Logger.log(
         'SettingsAWSSSOMultipleProviders _startSSOFlow',
-        'Could not get SSO configuration',
+        'Failed to Get SSO Configuration',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not get SSO configuration',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Get SSO Configuration',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -81,15 +82,16 @@ class _SettingsAWSSSOMultipleProvidersState
     } catch (err) {
       Logger.log(
         'SettingsAWSSSOMultipleProviders _verifyDevice',
-        'Could not verify device',
+        'Failed to Verify Device',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not verify device',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Verify Device',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -97,7 +99,7 @@ class _SettingsAWSSSOMultipleProvidersState
   /// including there roles. If we are able to get these information we show
   /// the [SettingsAWSSSOMultipleProvidersSelect] widget in the next step, where
   /// the user can select the accounts and roles he wants to add to the app.
-  Future<void> _loadAccounts(BuildContext context) async {
+  Future<void> _loadAccounts() async {
     try {
       if (_providerConfigFormKey.currentState != null &&
           _providerConfigFormKey.currentState!.validate()) {
@@ -131,12 +133,13 @@ class _SettingsAWSSSOMultipleProvidersState
       setState(() {
         _isLoading = false;
       });
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not load accounts and roles',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Load Accounts and Roles',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -157,119 +160,113 @@ class _SettingsAWSSSOMultipleProvidersState
       },
       actionText: 'Load Accounts and Roles',
       actionPressed: () {
-        _loadAccounts(context);
+        _loadAccounts();
       },
       actionIsLoading: _isLoading,
       child: Form(
         key: _providerConfigFormKey,
-        child: ListView(
-          shrinkWrap: false,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _startURLController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Start URL',
-                ),
-                validator: _validator,
-              ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: Constants.spacingMiddle,
+              bottom: Constants.spacingMiddle,
+              left: Constants.spacingMiddle,
+              right: Constants.spacingMiddle,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Text('SSO Region'),
-                  DropdownButton(
-                    value: _ssoRegion,
-                    underline: Container(
-                      height: 2,
-                      color: theme(context).colorPrimary,
-                    ),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _ssoRegion = newValue ?? '';
-                      });
-                    },
-                    items: awsRegions.map((value) {
-                      return DropdownMenuItem(
-                        value: value,
-                        child: Text(
-                          value,
-                          style: TextStyle(
-                            color: theme(context).colorTextPrimary,
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _startURLController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Start URL',
+                  ),
+                  validator: _validator,
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('SSO Region'),
+                    DropdownButton(
+                      value: _ssoRegion,
+                      underline: Container(
+                        height: 2,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _ssoRegion = newValue ?? '';
+                        });
+                      },
+                      items: awsRegions.map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value,
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .extension<CustomColors>()!
+                                  .textPrimary,
+                            ),
                           ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme(context).colorPrimary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(40),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      Constants.sizeBorderRadius,
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size.fromHeight(40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        Constants.sizeBorderRadius,
+                      ),
                     ),
                   ),
-                ),
-                onPressed: _startSSOFlow,
-                child: Text(
-                  'Sign In',
-                  style: primaryTextStyle(
-                    context,
-                    color: Colors.white,
+                  onPressed: _startSSOFlow,
+                  child: Text(
+                    'Sign In',
+                    style: primaryTextStyle(
+                      context,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme(context).colorPrimary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(40),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      Constants.sizeBorderRadius,
+                const SizedBox(height: Constants.spacingMiddle),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size.fromHeight(40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        Constants.sizeBorderRadius,
+                      ),
                     ),
                   ),
-                ),
-                onPressed: _awsSSOConfig == null ? null : _verifyDevice,
-                child: Text(
-                  'Verify',
-                  style: primaryTextStyle(
-                    context,
-                    color: Colors.white,
+                  onPressed: _awsSSOConfig == null ? null : _verifyDevice,
+                  child: Text(
+                    'Verify',
+                    style: primaryTextStyle(
+                      context,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

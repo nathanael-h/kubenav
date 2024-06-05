@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:kubenav/repositories/app_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/shared/app_actions_widget.dart';
 
 /// The [SettingsDeleteNamespace] widget is used to delete a namespace which was
@@ -28,13 +28,13 @@ class SettingsDeleteNamespace extends StatelessWidget {
       actions: [
         AppActionsWidgetAction(
           title: 'Delete',
-          color: theme(context).colorDanger,
+          color: Theme.of(context).extension<CustomColors>()!.error,
           onTap: () {
             appRepository.deleteNamespace(namespace);
             showSnackbar(
               context,
-              'Namespace deleted',
-              'The namespace $namespace was deleted',
+              'Namespace Deleted',
+              'The Namespace $namespace was deleted',
             );
             Navigator.pop(context);
           },

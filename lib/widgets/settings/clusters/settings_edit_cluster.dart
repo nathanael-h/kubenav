@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import 'package:kubenav/models/cluster.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/showmodal.dart';
 import 'package:kubenav/widgets/shared/app_bottom_sheet_widget.dart';
@@ -53,7 +52,7 @@ class _SettingsEditClusterState extends State<SettingsEditCluster> {
   /// parameter, by replacing all the values of the provided values with the
   /// values provided via the controllers. If we can not save the cluster in the
   /// clusters repository we show a snackbar with the returned error.
-  Future<void> _editCluster(BuildContext context) async {
+  Future<void> _editCluster() async {
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: false,
@@ -92,7 +91,7 @@ class _SettingsEditClusterState extends State<SettingsEditCluster> {
         if (mounted) {
           showSnackbar(
             context,
-            'Changes were saved',
+            'Cluster Saved',
             'The cluster ${_nameController.text} was saved',
           );
           Navigator.pop(context);
@@ -102,12 +101,13 @@ class _SettingsEditClusterState extends State<SettingsEditCluster> {
       setState(() {
         _isLoadingAddCluster = false;
       });
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not save cluster',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Save Cluster',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -153,183 +153,178 @@ class _SettingsEditClusterState extends State<SettingsEditCluster> {
       },
       actionText: 'Save',
       actionPressed: () {
-        _editCluster(context);
+        _editCluster();
       },
       actionIsLoading: _isLoadingAddCluster,
       child: Form(
         key: _editClusterFormKey,
-        child: ListView(
-          shrinkWrap: false,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _nameController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: null,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Name',
-                ),
-                validator: _validator,
-              ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: Constants.spacingMiddle,
+              bottom: Constants.spacingMiddle,
+              left: Constants.spacingMiddle,
+              right: Constants.spacingMiddle,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _clusterServerController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: null,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Server',
-                ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _clusterCertificateAuthorityDataController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: null,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Certificate Authority Data',
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Text('Insecure Skip TLS Verify'),
-                  Switch(
-                    activeColor: theme(context).colorPrimary,
-                    onChanged: (value) {
-                      setState(() {
-                        _clusterInsecureSkipTLSVerify =
-                            !_clusterInsecureSkipTLSVerify;
-                      });
-                    },
-                    value: _clusterInsecureSkipTLSVerify,
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Name',
                   ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _userClientCertificateDataController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: null,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Client Certificate Data',
+                  validator: _validator,
+                  onFieldSubmitted: (String value) {
+                    _editCluster();
+                  },
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _userClientKeyDataController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: null,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Client Key Data',
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _clusterServerController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Server',
+                  ),
+                  validator: _validator,
+                  onFieldSubmitted: (String value) {
+                    _editCluster();
+                  },
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _userTokenController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: null,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Token',
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _clusterCertificateAuthorityDataController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Certificate Authority Data',
+                  ),
+                  onFieldSubmitted: (String value) {
+                    _editCluster();
+                  },
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _userUsernameController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: null,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Username',
+                const SizedBox(height: Constants.spacingMiddle),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('Insecure Skip TLS Verify'),
+                    Switch(
+                      activeColor: Theme.of(context).colorScheme.primary,
+                      onChanged: (value) {
+                        setState(() {
+                          _clusterInsecureSkipTLSVerify =
+                              !_clusterInsecureSkipTLSVerify;
+                        });
+                      },
+                      value: _clusterInsecureSkipTLSVerify,
+                    ),
+                  ],
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _userPasswordController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: null,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Password',
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _userClientCertificateDataController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Client Certificate Data',
+                  ),
+                  onFieldSubmitted: (String value) {
+                    _editCluster();
+                  },
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _namespaceController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: null,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Namespace',
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _userClientKeyDataController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Client Key Data',
+                  ),
+                  onFieldSubmitted: (String value) {
+                    _editCluster();
+                  },
                 ),
-              ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _userTokenController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Token',
+                  ),
+                  onFieldSubmitted: (String value) {
+                    _editCluster();
+                  },
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _userUsernameController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Username',
+                  ),
+                  onFieldSubmitted: (String value) {
+                    _editCluster();
+                  },
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _userPasswordController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Password',
+                  ),
+                  onFieldSubmitted: (String value) {
+                    _editCluster();
+                  },
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _namespaceController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Namespace',
+                  ),
+                  onFieldSubmitted: (String value) {
+                    _editCluster();
+                  },
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

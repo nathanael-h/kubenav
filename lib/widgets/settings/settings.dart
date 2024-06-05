@@ -1,5 +1,3 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
@@ -13,6 +11,8 @@ import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/logger.dart';
 import 'package:kubenav/utils/navigate.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
+import 'package:kubenav/widgets/settings/settings/settings_home_page.dart';
 import 'package:kubenav/widgets/settings/settings/settings_info.dart';
 import 'package:kubenav/widgets/settings/settings/settings_prometheus.dart';
 import 'package:kubenav/widgets/settings/settings/settings_proxy.dart';
@@ -24,7 +24,6 @@ import 'package:kubenav/widgets/settings/settings_help.dart';
 import 'package:kubenav/widgets/settings/settings_namespaces.dart';
 import 'package:kubenav/widgets/settings/settings_providers.dart';
 import 'package:kubenav/widgets/shared/app_bottom_navigation_bar_widget.dart';
-import 'package:kubenav/widgets/shared/app_drawer.dart';
 import 'package:kubenav/widgets/shared/app_floating_action_buttons_widget.dart';
 import 'package:kubenav/widgets/shared/app_list_item.dart';
 import 'package:kubenav/widgets/shared/app_no_clusters_widget.dart';
@@ -51,25 +50,23 @@ class Settings extends StatelessWidget {
     );
 
     if (clustersRepository.clusters.isEmpty) {
-      return const AppNoClustersWidget();
+      return const Padding(
+        padding: EdgeInsets.only(
+          left: Constants.spacingMiddle,
+          right: Constants.spacingMiddle,
+        ),
+        child: AppNoClustersWidget(),
+      );
     }
 
     int maxClusters = 6;
-    if (Platform.isLinux || Platform.isMacOS || Platform.isWindows) {
-      maxClusters = 12;
-    }
 
-    return Container(
-      padding: const EdgeInsets.only(
-        left: Constants.spacingMiddle,
-        right: Constants.spacingMiddle,
-      ),
+    return SizedBox(
       height: 128,
       child: GridView.count(
         scrollDirection: Axis.horizontal,
         crossAxisCount: 2,
         childAspectRatio: 0.25,
-        mainAxisSpacing: 16.0,
         children: List.generate(
           clustersRepository.clusters.length <= maxClusters
               ? clustersRepository.clusters.length
@@ -79,8 +76,8 @@ class Settings extends StatelessWidget {
               margin: const EdgeInsets.only(
                 top: Constants.spacingSmall,
                 bottom: Constants.spacingSmall,
-                left: Constants.spacingSmall,
-                right: Constants.spacingSmall,
+                left: Constants.spacingMiddle,
+                right: Constants.spacingMiddle,
               ),
               child: AppListItem(
                 onTap: () {
@@ -96,7 +93,7 @@ class Settings extends StatelessWidget {
                           ? Icons.radio_button_checked
                           : Icons.radio_button_unchecked,
                       size: 24,
-                      color: theme(context).colorPrimary,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(width: Constants.spacingSmall),
                     Expanded(
@@ -124,11 +121,8 @@ class Settings extends StatelessWidget {
   /// page, where a user can add more clusters or reorder his existing clusters.
   Widget _buildViewAllClusters(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(
-        top: Constants.spacingMiddle,
-        left: Constants.spacingMiddle,
-        right: Constants.spacingMiddle,
-        bottom: Constants.spacingSmall,
+      padding: const EdgeInsets.all(
+        Constants.spacingMiddle,
       ),
       child: Row(
         children: [
@@ -140,19 +134,19 @@ class Settings extends StatelessWidget {
             onTap: () {
               navigate(context, const SettingsClusters());
             },
-            child: Wrap(
+            child: Row(
               children: [
                 Text(
                   'View all',
                   style: secondaryTextStyle(
                     context,
-                    color: theme(context).colorPrimary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 const SizedBox(width: Constants.spacingExtraSmall),
                 Icon(
                   Icons.keyboard_arrow_right,
-                  color: theme(context).colorPrimary,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 16,
                 ),
               ],
@@ -172,417 +166,24 @@ class Settings extends StatelessWidget {
     try {
       await appRepository.toogleAuthentication();
     } catch (err) {
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not enabled authentication',
-        err.toString(),
-      );
+      if (context.mounted) {
+        showSnackbar(
+          context,
+          'Failed to Enable Authentication',
+          err.toString(),
+        );
+      }
     }
-  }
-
-  /// buildSettings returns a list for our [AppVertialListSimpleWidget] widget,
-  /// with all entries which should be shown under the settings headline. These
-  /// settings can be used to modify the added providers on the Android and iOS
-  /// version of the app or to modify the appearance of the app or to configure
-  /// additional settings for plugins.
-  List<AppVertialListSimpleModel> buildSettings(BuildContext context) {
-    ThemeRepository themeRepository = Provider.of<ThemeRepository>(
-      context,
-      listen: false,
-    );
-    AppRepository appRepository = Provider.of<AppRepository>(
-      context,
-      listen: false,
-    );
-
-    final List<AppVertialListSimpleModel> items = [];
-
-    if (Platform.isAndroid || Platform.isIOS) {
-      items.add(
-        AppVertialListSimpleModel(
-          onTap: () {
-            navigate(context, const SettingsProviders());
-          },
-          children: [
-            Icon(
-              CustomIcons.kubernetes,
-              color: theme(context).colorPrimary,
-            ),
-            const SizedBox(width: Constants.spacingSmall),
-            Expanded(
-              flex: 1,
-              child: Text(
-                'Provider',
-                style: noramlTextStyle(
-                  context,
-                ),
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: theme(context)
-                  .colorTextPrimary
-                  .withOpacity(Constants.opacityIcon),
-              size: 16,
-            ),
-          ],
-        ),
-      );
-    }
-
-    items.add(
-      AppVertialListSimpleModel(
-        onTap: () {
-          navigate(
-            context,
-            const SettingsNamespaces(),
-          );
-        },
-        children: [
-          Icon(
-            CustomIcons.namespaces,
-            color: theme(context).colorPrimary,
-          ),
-          const SizedBox(width: Constants.spacingSmall),
-          Expanded(
-            flex: 1,
-            child: Text(
-              'Namespaces',
-              style: noramlTextStyle(
-                context,
-              ),
-            ),
-          ),
-          Icon(
-            Icons.arrow_forward_ios,
-            color: theme(context)
-                .colorTextPrimary
-                .withOpacity(Constants.opacityIcon),
-            size: 16,
-          ),
-        ],
-      ),
-    );
-
-    if (Platform.isAndroid || Platform.isIOS) {
-      items.add(
-        AppVertialListSimpleModel(
-          children: [
-            Icon(
-              Icons.fingerprint,
-              color: theme(context).colorPrimary,
-            ),
-            const SizedBox(width: Constants.spacingSmall),
-            Expanded(
-              flex: 1,
-              child: Text(
-                'Authentication',
-                style: noramlTextStyle(
-                  context,
-                ),
-              ),
-            ),
-            Switch(
-              activeColor: theme(context).colorPrimary,
-              onChanged: (value) {
-                _toogleAuthentication(context);
-              },
-              value: appRepository.settings.isAuthenticationEnabled,
-            ),
-          ],
-        ),
-      );
-    }
-
-    items.add(
-      AppVertialListSimpleModel(
-        children: [
-          Icon(
-            CustomIcons.clusters,
-            color: theme(context).colorPrimary,
-          ),
-          const SizedBox(width: Constants.spacingSmall),
-          Expanded(
-            flex: 1,
-            child: Text(
-              'Show Cluster on Start',
-              style: noramlTextStyle(
-                context,
-              ),
-            ),
-          ),
-          Switch(
-            activeColor: theme(context).colorPrimary,
-            onChanged: (value) {
-              appRepository.setIsShowClustersOnStart(
-                !appRepository.settings.isShowClustersOnStart,
-              );
-            },
-            value: appRepository.settings.isShowClustersOnStart,
-          ),
-        ],
-      ),
-    );
-
-    items.add(
-      AppVertialListSimpleModel(
-        children: [
-          Icon(
-            Icons.code,
-            color: theme(context).colorPrimary,
-          ),
-          const SizedBox(width: Constants.spacingSmall),
-          Expanded(
-            flex: 1,
-            child: Text(
-              'Theme',
-              style: noramlTextStyle(
-                context,
-              ),
-            ),
-          ),
-          DropdownButton(
-            value: themeRepository.themeName,
-            underline: Container(
-              height: 2,
-              color: theme(context).colorPrimary,
-            ),
-            onChanged: (ThemeName? value) {
-              themeRepository.setThemeName(value ?? ThemeName.light);
-            },
-            items: ThemeName.values.map((value) {
-              return DropdownMenuItem(
-                value: value,
-                child: Text(
-                  value.toShortString(),
-                  style: TextStyle(
-                    color: theme(context).colorTextPrimary,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-
-    items.add(
-      AppVertialListSimpleModel(
-        children: [
-          Icon(
-            Icons.code,
-            color: theme(context).colorPrimary,
-          ),
-          const SizedBox(width: Constants.spacingSmall),
-          Expanded(
-            flex: 1,
-            child: Text(
-              'Editor Format',
-              style: noramlTextStyle(
-                context,
-              ),
-            ),
-          ),
-          DropdownButton(
-            value: appRepository.settings.editorFormat,
-            underline: Container(
-              height: 2,
-              color: theme(context).colorPrimary,
-            ),
-            onChanged: (String? newValue) {
-              appRepository.setEditorFormat(newValue ?? 'yaml');
-            },
-            items: [
-              'yaml',
-              'json',
-            ].map((value) {
-              return DropdownMenuItem(
-                value: value,
-                child: Text(
-                  value,
-                  style: TextStyle(
-                    color: theme(context).colorTextPrimary,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-
-    items.add(
-      AppVertialListSimpleModel(
-        children: [
-          Icon(
-            Icons.code,
-            color: theme(context).colorPrimary,
-          ),
-          const SizedBox(width: Constants.spacingSmall),
-          Expanded(
-            flex: 1,
-            child: Text(
-              'Full Height Modals',
-              style: noramlTextStyle(
-                context,
-              ),
-            ),
-          ),
-          Switch(
-            activeColor: theme(context).colorPrimary,
-            onChanged: (value) => {appRepository.setFullHeightModals(value)},
-            value: appRepository.settings.fullHeightModals,
-          ),
-        ],
-      ),
-    );
-
-    items.add(
-      AppVertialListSimpleModel(
-        children: [
-          Icon(
-            Icons.dashboard,
-            color: theme(context).colorPrimary,
-          ),
-          const SizedBox(width: Constants.spacingSmall),
-          Expanded(
-            flex: 1,
-            child: Text(
-              'Classic Mode',
-              style: noramlTextStyle(
-                context,
-              ),
-            ),
-          ),
-          Switch(
-            activeColor: theme(context).colorPrimary,
-            onChanged: (value) => {appRepository.setClassicMode(value)},
-            value: appRepository.settings.classicMode,
-          ),
-        ],
-      ),
-    );
-
-    items.add(
-      AppVertialListSimpleModel(
-        onTap: () {
-          showModal(
-            context,
-            SettingsProxy(
-              currentProxy: appRepository.settings.proxy,
-            ),
-          );
-        },
-        children: [
-          Icon(
-            Icons.http,
-            color: theme(context).colorPrimary,
-          ),
-          const SizedBox(width: Constants.spacingSmall),
-          Expanded(
-            flex: 1,
-            child: Text(
-              'Proxy',
-              style: noramlTextStyle(
-                context,
-              ),
-            ),
-          ),
-          Icon(
-            Icons.arrow_forward_ios,
-            color: theme(context)
-                .colorTextPrimary
-                .withOpacity(Constants.opacityIcon),
-            size: 16,
-          ),
-        ],
-      ),
-    );
-
-    items.add(
-      AppVertialListSimpleModel(
-        onTap: () {
-          showModal(
-            context,
-            SettingsTimeout(
-              currentTimeout: appRepository.settings.timeout,
-            ),
-          );
-        },
-        children: [
-          Icon(
-            Icons.schedule,
-            color: theme(context).colorPrimary,
-          ),
-          const SizedBox(width: Constants.spacingSmall),
-          Expanded(
-            flex: 1,
-            child: Text(
-              'Timeout',
-              style: noramlTextStyle(
-                context,
-              ),
-            ),
-          ),
-          Icon(
-            Icons.arrow_forward_ios,
-            color: theme(context)
-                .colorTextPrimary
-                .withOpacity(Constants.opacityIcon),
-            size: 16,
-          ),
-        ],
-      ),
-    );
-
-    items.add(
-      AppVertialListSimpleModel(
-        onTap: () {
-          showModal(
-            context,
-            SettingsPrometheus(
-              currentPrometheus: appRepository.settings.prometheus,
-            ),
-          );
-        },
-        children: [
-          Icon(
-            Icons.extension,
-            color: theme(context).colorPrimary,
-          ),
-          const SizedBox(width: Constants.spacingSmall),
-          Expanded(
-            flex: 1,
-            child: Text(
-              'Prometheus',
-              style: noramlTextStyle(
-                context,
-              ),
-            ),
-          ),
-          Icon(
-            Icons.arrow_forward_ios,
-            color: theme(context)
-                .colorTextPrimary
-                .withOpacity(Constants.opacityIcon),
-            size: 16,
-          ),
-        ],
-      ),
-    );
-
-    return items;
   }
 
   /// [buildHelp] builds the help section in the settings. From the help section
   /// a user can access the help screen [SettingsHelp] or the logs via the
   /// [Logger] which were created during his actions in the app
   Widget buildHelp(BuildContext context) {
-    return AppVertialListSimpleWidget(
+    return AppVerticalListSimpleWidget(
       title: 'Help',
       items: [
-        AppVertialListSimpleModel(
+        AppVerticalListSimpleModel(
           onTap: () {
             showModal(
               context,
@@ -592,7 +193,7 @@ class Settings extends StatelessWidget {
           children: [
             Icon(
               Icons.subject,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: Constants.spacingSmall),
             Expanded(
@@ -606,14 +207,15 @@ class Settings extends StatelessWidget {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: theme(context)
-                  .colorTextPrimary
+              color: Theme.of(context)
+                  .extension<CustomColors>()!
+                  .textPrimary
                   .withOpacity(Constants.opacityIcon),
               size: 16,
             ),
           ],
         ),
-        AppVertialListSimpleModel(
+        AppVerticalListSimpleModel(
           onTap: () {
             navigate(
               context,
@@ -623,7 +225,7 @@ class Settings extends StatelessWidget {
           children: [
             Icon(
               Icons.help,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: Constants.spacingSmall),
             Expanded(
@@ -637,8 +239,9 @@ class Settings extends StatelessWidget {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: theme(context)
-                  .colorTextPrimary
+              color: Theme.of(context)
+                  .extension<CustomColors>()!
+                  .textPrimary
                   .withOpacity(Constants.opacityIcon),
               size: 16,
             ),
@@ -650,7 +253,7 @@ class Settings extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Provider.of<ThemeRepository>(
+    ThemeRepository themeRepository = Provider.of<ThemeRepository>(
       context,
       listen: true,
     );
@@ -664,29 +267,365 @@ class Settings extends StatelessWidget {
     );
 
     return Scaffold(
-      drawer: appRepository.settings.classicMode ? const AppDrawer() : null,
       appBar: AppBar(
         centerTitle: true,
         title: const Text('Settings'),
       ),
-      bottomNavigationBar: appRepository.settings.classicMode
-          ? null
-          : const AppBottomNavigationBarWidget(),
+      bottomNavigationBar: const AppBottomNavigationBarWidget(),
       floatingActionButton: const AppFloatingActionButtonsWidget(),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
-              const SizedBox(height: Constants.spacingSmall),
               const SettingsSponsorBanner(),
               _buildViewAllClusters(context),
               _buildClusters(context),
-              AppVertialListSimpleWidget(
+              const SizedBox(height: Constants.spacingMiddle),
+              AppVerticalListSimpleWidget(
                 title: 'Settings',
-                items: buildSettings(context),
+                items: [
+                  AppVerticalListSimpleModel(
+                    onTap: () {
+                      navigate(context, const SettingsProviders());
+                    },
+                    children: [
+                      Icon(
+                        CustomIcons.kubernetes,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: Constants.spacingSmall),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'Provider',
+                          style: noramlTextStyle(
+                            context,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: Theme.of(context)
+                            .extension<CustomColors>()!
+                            .textPrimary
+                            .withOpacity(Constants.opacityIcon),
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                  AppVerticalListSimpleModel(
+                    onTap: () {
+                      navigate(
+                        context,
+                        const SettingsNamespaces(),
+                      );
+                    },
+                    children: [
+                      Icon(
+                        CustomIcons.namespaces,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: Constants.spacingSmall),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'Namespaces',
+                          style: noramlTextStyle(
+                            context,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: Theme.of(context)
+                            .extension<CustomColors>()!
+                            .textPrimary
+                            .withOpacity(Constants.opacityIcon),
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                  AppVerticalListSimpleModel(
+                    children: [
+                      Icon(
+                        Icons.fingerprint,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: Constants.spacingSmall),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'Authentication',
+                          style: noramlTextStyle(
+                            context,
+                          ),
+                        ),
+                      ),
+                      Switch(
+                        activeColor: Theme.of(context).colorScheme.primary,
+                        onChanged: (value) {
+                          _toogleAuthentication(context);
+                        },
+                        value: appRepository.settings.isAuthenticationEnabled,
+                      ),
+                    ],
+                  ),
+                  AppVerticalListSimpleModel(
+                    children: [
+                      Icon(
+                        CustomIcons.clusters,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: Constants.spacingSmall),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'Show Cluster on Start',
+                          style: noramlTextStyle(
+                            context,
+                          ),
+                        ),
+                      ),
+                      Switch(
+                        activeColor: Theme.of(context).colorScheme.primary,
+                        onChanged: (value) {
+                          appRepository.setIsShowClustersOnStart(
+                            !appRepository.settings.isShowClustersOnStart,
+                          );
+                        },
+                        value: appRepository.settings.isShowClustersOnStart,
+                      ),
+                    ],
+                  ),
+                  AppVerticalListSimpleModel(
+                    children: [
+                      Icon(
+                        Icons.code,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: Constants.spacingSmall),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'Theme',
+                          style: noramlTextStyle(
+                            context,
+                          ),
+                        ),
+                      ),
+                      DropdownButton(
+                        value: themeRepository.themeName,
+                        underline: Container(
+                          height: 2,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        onChanged: (ThemeName? value) {
+                          themeRepository
+                              .setThemeName(value ?? ThemeName.light);
+                        },
+                        items: ThemeName.values.map((value) {
+                          return DropdownMenuItem(
+                            value: value,
+                            child: Text(
+                              value.toShortString(),
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .extension<CustomColors>()!
+                                    .textPrimary,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                  AppVerticalListSimpleModel(
+                    children: [
+                      Icon(
+                        Icons.code,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: Constants.spacingSmall),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'Editor Format',
+                          style: noramlTextStyle(
+                            context,
+                          ),
+                        ),
+                      ),
+                      DropdownButton(
+                        value: appRepository.settings.editorFormat,
+                        underline: Container(
+                          height: 2,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        onChanged: (String? newValue) {
+                          appRepository.setEditorFormat(newValue ?? 'yaml');
+                        },
+                        items: [
+                          'yaml',
+                          'json',
+                        ].map((value) {
+                          return DropdownMenuItem(
+                            value: value,
+                            child: Text(
+                              value,
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .extension<CustomColors>()!
+                                    .textPrimary,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                  AppVerticalListSimpleModel(
+                    onTap: () {
+                      showModal(
+                        context,
+                        SettingsHomePage(
+                          currentHome: appRepository.settings.home,
+                        ),
+                      );
+                    },
+                    children: [
+                      Icon(
+                        Icons.home,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: Constants.spacingSmall),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'Home Page',
+                          style: noramlTextStyle(
+                            context,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: Theme.of(context)
+                            .extension<CustomColors>()!
+                            .textPrimary
+                            .withOpacity(Constants.opacityIcon),
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                  AppVerticalListSimpleModel(
+                    onTap: () {
+                      showModal(
+                        context,
+                        SettingsProxy(
+                          currentProxy: appRepository.settings.proxy,
+                        ),
+                      );
+                    },
+                    children: [
+                      Icon(
+                        Icons.http,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: Constants.spacingSmall),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'Proxy',
+                          style: noramlTextStyle(
+                            context,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: Theme.of(context)
+                            .extension<CustomColors>()!
+                            .textPrimary
+                            .withOpacity(Constants.opacityIcon),
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                  AppVerticalListSimpleModel(
+                    onTap: () {
+                      showModal(
+                        context,
+                        SettingsTimeout(
+                          currentTimeout: appRepository.settings.timeout,
+                        ),
+                      );
+                    },
+                    children: [
+                      Icon(
+                        Icons.schedule,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: Constants.spacingSmall),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'Timeout',
+                          style: noramlTextStyle(
+                            context,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: Theme.of(context)
+                            .extension<CustomColors>()!
+                            .textPrimary
+                            .withOpacity(Constants.opacityIcon),
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                  AppVerticalListSimpleModel(
+                    onTap: () {
+                      showModal(
+                        context,
+                        SettingsPrometheus(
+                          currentPrometheus: appRepository.settings.prometheus,
+                        ),
+                      );
+                    },
+                    children: [
+                      Icon(
+                        Icons.extension,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: Constants.spacingSmall),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'Prometheus',
+                          style: noramlTextStyle(
+                            context,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: Theme.of(context)
+                            .extension<CustomColors>()!
+                            .textPrimary
+                            .withOpacity(Constants.opacityIcon),
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ],
               ),
+              const SizedBox(height: Constants.spacingMiddle),
               const SettingsSponsor(),
+              const SizedBox(height: Constants.spacingMiddle),
               buildHelp(context),
+              const SizedBox(height: Constants.spacingMiddle),
               const SettingsInfo(),
               const SizedBox(height: Constants.spacingMiddle),
             ],

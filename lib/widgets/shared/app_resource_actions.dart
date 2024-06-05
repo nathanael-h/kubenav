@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/shared/app_actions_widget.dart';
 
 /// The [AppResourceActionsMode] enum defines all the modes which are supported
@@ -10,7 +10,6 @@ import 'package:kubenav/widgets/shared/app_actions_widget.dart';
 enum AppResourceActionsMode {
   header,
   actions,
-  menu,
 }
 
 /// [AppResourceActionsModel] is the class to define an action for the
@@ -38,8 +37,6 @@ class AppResourceActionsModel {
 /// - `actions`: The actions will be shown via an [AppActionsWidget]. When this
 ///   mode is selected we will call `Navigator.pop(context)` before the defined
 ///   `onTap` function of an action to close the actions menu.
-/// - `menu`: The actions will be shown via a menu which is accesable via the
-///   [AppBar].
 class AppResourceActions extends StatelessWidget {
   const AppResourceActions({
     super.key,
@@ -58,13 +55,15 @@ class AppResourceActions extends StatelessWidget {
             ? 90
             : actions.length <= 6
                 ? 180
-                : 270,
+                : actions.length <= 9
+                    ? 270
+                    : 360,
         width: MediaQuery.of(context).size.width,
         margin: const EdgeInsets.only(
           bottom: Constants.spacingExtraLarge,
         ),
         decoration: BoxDecoration(
-          color: theme(context).colorPrimary,
+          color: Theme.of(context).colorScheme.primary,
           borderRadius: BorderRadius.vertical(
             bottom: Radius.elliptical(MediaQuery.of(context).size.width, 80.0),
           ),
@@ -79,13 +78,13 @@ class AppResourceActions extends StatelessWidget {
           decoration: BoxDecoration(
             boxShadow: [
               BoxShadow(
-                color: theme(context).colorShadow,
+                color: Theme.of(context).extension<CustomColors>()!.shadow,
                 blurRadius: Constants.sizeBorderBlurRadius,
                 spreadRadius: Constants.sizeBorderSpreadRadius,
                 offset: const Offset(0.0, 0.0),
               ),
             ],
-            color: theme(context).colorCard,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: const BorderRadius.all(
               Radius.circular(Constants.sizeBorderRadius),
             ),
@@ -112,7 +111,7 @@ class AppResourceActions extends StatelessWidget {
                           children: [
                             Icon(
                               action.icon,
-                              color: theme(context).colorPrimary,
+                              color: Theme.of(context).colorScheme.primary,
                               size: 28,
                             ),
                             const SizedBox(
@@ -142,7 +141,7 @@ class AppResourceActions extends StatelessWidget {
           (e) {
             return AppActionsWidgetAction(
               title: e.title,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
               onTap: () {
                 Navigator.pop(context);
                 e.onTap();
@@ -150,25 +149,6 @@ class AppResourceActions extends StatelessWidget {
             );
           },
         ).toList(),
-      );
-    }
-
-    if (mode == AppResourceActionsMode.menu) {
-      return PopupMenuButton(
-        icon: const Icon(Icons.more_vert),
-        itemBuilder: (context) {
-          return actions.asMap().entries.map(
-            (e) {
-              return PopupMenuItem(
-                value: e.key,
-                child: Text(e.value.title),
-              );
-            },
-          ).toList();
-        },
-        onSelected: (value) {
-          actions[value].onTap();
-        },
       );
     }
 

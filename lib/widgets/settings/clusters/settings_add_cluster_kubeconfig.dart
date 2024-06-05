@@ -10,7 +10,6 @@ import 'package:yaml/yaml.dart';
 import 'package:kubenav/models/cluster_provider.dart';
 import 'package:kubenav/models/kubernetes_extensions/kubeconfig.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/logger.dart';
@@ -67,14 +66,15 @@ class _SettingsAddClusterKubeconfigState
     } catch (err) {
       Logger.log(
         'SettingsAddClusterKubeconfig _selectKubeconfigFile',
-        'Could not select file: $err',
+        'Failed to Select File',
+        err,
       );
     }
   }
 
   /// [_addCluster] adds a new cluster to our global list of clusters. Before we
   /// add the cluster we validate all the form values which have an validator.
-  Future<void> _addCluster(BuildContext context) async {
+  Future<void> _addCluster() async {
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: false,
@@ -112,7 +112,7 @@ class _SettingsAddClusterKubeconfigState
         if (mounted) {
           showSnackbar(
             context,
-            'Clusters were added',
+            'Clusters Added',
             '$count clusters were added',
           );
           Navigator.pop(context);
@@ -121,12 +121,13 @@ class _SettingsAddClusterKubeconfigState
         setState(() {
           _isLoadingAddCluster = false;
         });
-        if (!context.mounted) return;
-        showSnackbar(
-          context,
-          'Could not add clusters',
-          err.toString(),
-        );
+        if (mounted) {
+          showSnackbar(
+            context,
+            'Failed to Add Clusters',
+            err.toString(),
+          );
+        }
       }
     }
   }
@@ -148,88 +149,86 @@ class _SettingsAddClusterKubeconfigState
       },
       actionText: 'Add Clusters',
       actionPressed: () {
-        _addCluster(context);
+        _addCluster();
       },
       actionIsLoading: _isLoadingAddCluster,
       child: Form(
         key: _addClusterKubeconfigFormKey,
-        child: ListView(
-          shrinkWrap: false,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: 8,
-              ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme(context).colorPrimary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(40),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      Constants.sizeBorderRadius,
-                    ),
-                  ),
-                ),
-                onPressed: () {
-                  _selectKubeconfigFile();
-                },
-                child: Text(
-                  'Select Kubeconfig',
-                  style: primaryTextStyle(
-                    context,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: Constants.spacingMiddle,
+              bottom: Constants.spacingMiddle,
+              left: Constants.spacingMiddle,
+              right: Constants.spacingMiddle,
             ),
-            Padding(
-              padding: const EdgeInsets.only(
-                top: Constants.spacingMiddle,
-                bottom: Constants.spacingMiddle,
-              ),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Divider(
-                      height: 0,
-                      thickness: 1.0,
+            child: Column(
+              children: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size.fromHeight(40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        Constants.sizeBorderRadius,
+                      ),
                     ),
                   ),
-                  Text(
-                    'or paste content',
-                    style: secondaryTextStyle(
+                  onPressed: () {
+                    _selectKubeconfigFile();
+                  },
+                  child: Text(
+                    'Select Kubeconfig',
+                    style: primaryTextStyle(
                       context,
+                      color: Theme.of(context).colorScheme.onPrimary,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                  const Expanded(
-                    child: Divider(
-                      height: 0,
-                      thickness: 1.0,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: 8,
-              ),
-              child: TextFormField(
-                controller: _kubeconfigController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: null,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Kubeconfig',
                 ),
-                validator: _validator,
-              ),
+                const SizedBox(height: Constants.spacingMiddle),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Divider(
+                        height: 0,
+                        thickness: 1.0,
+                      ),
+                    ),
+                    Text(
+                      'or paste content',
+                      style: secondaryTextStyle(
+                        context,
+                      ),
+                    ),
+                    const Expanded(
+                      child: Divider(
+                        height: 0,
+                        thickness: 1.0,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _kubeconfigController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Kubeconfig',
+                  ),
+                  validator: _validator,
+                  onFieldSubmitted: (String value) {
+                    _addCluster();
+                  },
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

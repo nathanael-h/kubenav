@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
@@ -6,7 +9,6 @@ import 'package:kubenav/models/kubernetes/io_k8s_api_core_v1_config_map.dart';
 import 'package:kubenav/models/kubernetes/io_k8s_api_core_v1_config_map_list.dart';
 import 'package:kubenav/repositories/app_repository.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/services/kubernetes_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/custom_icons.dart';
@@ -15,13 +17,18 @@ import 'package:kubenav/utils/logger.dart';
 import 'package:kubenav/utils/navigate.dart';
 import 'package:kubenav/utils/showmodal.dart';
 import 'package:kubenav/widgets/plugins/prometheus/plugin_prometheus_details.dart';
+import 'package:kubenav/widgets/resources/resources/resources_configmaps.dart';
 import 'package:kubenav/widgets/shared/app_bottom_navigation_bar_widget.dart';
-import 'package:kubenav/widgets/shared/app_drawer.dart';
 import 'package:kubenav/widgets/shared/app_error_widget.dart';
 import 'package:kubenav/widgets/shared/app_floating_action_buttons_widget.dart';
 import 'package:kubenav/widgets/shared/app_list_item.dart';
 import 'package:kubenav/widgets/shared/app_namespaces_widget.dart';
 import 'package:kubenav/widgets/shared/app_resource_actions.dart';
+
+IoK8sApiCoreV1ConfigMapList? _decodeResult(String result) {
+  final parsed = json.decode(result);
+  return IoK8sApiCoreV1ConfigMapList.fromJson(parsed);
+}
 
 /// The [PluginPrometheusList] widget is used to render a list of Prometheus
 /// dashboards, which can be created by users via ConfigMaps with a
@@ -56,7 +63,7 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
     );
 
     final url =
-        '/api/v1${cluster!.namespace != '' ? '/namespaces/${cluster.namespace}' : ''}/configmaps?labelSelector=kubenav.io/prometheus=dashboard';
+        '${resourceConfigMap.path}${cluster!.namespace != '' ? '/namespaces/${cluster.namespace}' : ''}/${resourceConfigMap.resource}?labelSelector=kubenav.io/prometheus=dashboard';
 
     final result = await KubernetesService(
       cluster: cluster,
@@ -64,11 +71,11 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
       timeout: appRepository.settings.timeout,
     ).getRequest(url);
 
-    final configMapsList = IoK8sApiCoreV1ConfigMapList.fromJson(result);
+    final configMapsList = await compute(_decodeResult, result);
 
     Logger.log(
-      'PluginPrometheusListRepository fetchDashboards',
-      '${configMapsList?.items.length} ConfigMaps were returned',
+      'PluginPrometheusList fetchDashboards',
+      '${configMapsList?.items.length} ConfigMaps Returned',
     );
 
     final List<IoK8sApiCoreV1ConfigMap> configMaps = [];
@@ -83,7 +90,7 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
 
   /// [_buildItem] returns the widget for a single dashboard which is displayed
   /// in the list of dashboards.
-  Widget _buildItem(BuildContext context, IoK8sApiCoreV1ConfigMap configMap) {
+  Widget _buildItem(IoK8sApiCoreV1ConfigMap configMap) {
     return AppListItem(
       onTap: () {
         navigate(
@@ -149,34 +156,6 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
     );
   }
 
-  /// [_buildHeaderActions] returns the Prometheus list actions as header when
-  /// the user didn't opt in for the classic mode.
-  Widget _buildHeaderActions(BuildContext context) {
-    AppRepository appRepository = Provider.of<AppRepository>(
-      context,
-      listen: false,
-    );
-
-    if (!appRepository.settings.classicMode) {
-      return AppResourceActions(
-        mode: AppResourceActionsMode.header,
-        actions: [
-          AppResourceActionsModel(
-            title: 'Refresh',
-            icon: Icons.refresh,
-            onTap: () {
-              setState(() {
-                _futureFetchDashboards = _fetchDashboards();
-              });
-            },
-          ),
-        ],
-      );
-    }
-
-    return Container();
-  }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -187,11 +166,7 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
 
   @override
   Widget build(BuildContext context) {
-    Provider.of<ThemeRepository>(
-      context,
-      listen: true,
-    );
-    AppRepository appRepository = Provider.of<AppRepository>(
+    Provider.of<AppRepository>(
       context,
       listen: true,
     );
@@ -201,45 +176,16 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
     );
 
     return Scaffold(
-      drawer: appRepository.settings.classicMode ? const AppDrawer() : null,
       appBar: AppBar(
         centerTitle: true,
-
-        /// If the user opt in for the classic mode, we show the actions for the
-        /// Prometheus list view in the [AppBar] next to the namespace
-        /// selection. If a user does not use this mode we only show the
-        /// namespace selection action.
-        actions: appRepository.settings.classicMode
-            ? [
-                IconButton(
-                  icon: const Icon(CustomIcons.namespaces),
-                  onPressed: () {
-                    showModal(context, const AppNamespacesWidget());
-                  },
-                ),
-                AppResourceActions(
-                  mode: AppResourceActionsMode.menu,
-                  actions: [
-                    AppResourceActionsModel(
-                      title: 'Refresh',
-                      icon: Icons.refresh,
-                      onTap: () {
-                        setState(() {
-                          _futureFetchDashboards = _fetchDashboards();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ]
-            : [
-                IconButton(
-                  icon: const Icon(CustomIcons.namespaces),
-                  onPressed: () {
-                    showModal(context, const AppNamespacesWidget());
-                  },
-                ),
-              ],
+        actions: [
+          IconButton(
+            icon: const Icon(CustomIcons.namespaces),
+            onPressed: () {
+              showModal(context, const AppNamespacesWidget());
+            },
+          ),
+        ],
         title: Column(
           children: [
             Text(
@@ -254,20 +200,20 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
               ),
             ),
             Text(
-              Characters(clustersRepository
-                              .getCluster(
-                                clustersRepository.activeClusterId,
-                              )!
-                              .namespace ==
-                          ''
-                      ? 'All Namespaces'
-                      : clustersRepository
-                          .getCluster(
-                            clustersRepository.activeClusterId,
-                          )!
-                          .namespace)
-                  .replaceAll(Characters(''), Characters('\u{200B}'))
-                  .toString(),
+              Characters(
+                clustersRepository
+                            .getCluster(
+                              clustersRepository.activeClusterId,
+                            )!
+                            .namespace ==
+                        ''
+                    ? 'All Namespaces'
+                    : clustersRepository
+                        .getCluster(
+                          clustersRepository.activeClusterId,
+                        )!
+                        .namespace,
+              ).replaceAll(Characters(''), Characters('\u{200B}')).toString(),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 14,
@@ -278,9 +224,7 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
           ],
         ),
       ),
-      bottomNavigationBar: appRepository.settings.classicMode
-          ? null
-          : const AppBottomNavigationBarWidget(),
+      bottomNavigationBar: const AppBottomNavigationBarWidget(),
       floatingActionButton: const AppFloatingActionButtonsWidget(),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -300,10 +244,11 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Padding(
-                            padding:
-                                const EdgeInsets.all(Constants.spacingMiddle),
+                            padding: const EdgeInsets.all(
+                              Constants.spacingMiddle,
+                            ),
                             child: CircularProgressIndicator(
-                              color: theme(context).colorPrimary,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
                         ],
@@ -320,7 +265,7 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
                                   Constants.spacingMiddle,
                                 ),
                                 child: AppErrorWidget(
-                                  message: 'Could not load dashboards',
+                                  message: 'Failed to Load Dashboards',
                                   details: snapshot.error.toString(),
                                   icon: 'assets/plugins/prometheus.svg',
                                 ),
@@ -332,7 +277,20 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
 
                       return Wrap(
                         children: [
-                          _buildHeaderActions(context),
+                          AppResourceActions(
+                            mode: AppResourceActionsMode.header,
+                            actions: [
+                              AppResourceActionsModel(
+                                title: 'Refresh',
+                                icon: Icons.refresh,
+                                onTap: () {
+                                  setState(() {
+                                    _futureFetchDashboards = _fetchDashboards();
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
                           Container(
                             padding: const EdgeInsets.only(
                               top: Constants.spacingMiddle,
@@ -351,10 +309,7 @@ class _PluginPrometheusListState extends State<PluginPrometheusList> {
                               ),
                               itemCount: snapshot.data!.length,
                               itemBuilder: (context, index) {
-                                return _buildItem(
-                                  context,
-                                  snapshot.data![index],
-                                );
+                                return _buildItem(snapshot.data![index]);
                               },
                             ),
                           ),

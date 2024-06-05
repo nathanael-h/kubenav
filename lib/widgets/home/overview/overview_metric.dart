@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:fl_chart/fl_chart.dart';
@@ -8,11 +11,11 @@ import 'package:kubenav/models/kubernetes/io_k8s_api_core_v1_pod_list.dart';
 import 'package:kubenav/models/kubernetes_extensions/node_metrics.dart';
 import 'package:kubenav/repositories/app_repository.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/services/kubernetes_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
-import 'package:kubenav/utils/resources/general.dart';
+import 'package:kubenav/utils/resources.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/shared/app_bottom_sheet_widget.dart';
 import 'package:kubenav/widgets/shared/app_error_widget.dart';
 
@@ -74,6 +77,125 @@ class Metrics {
   }
 }
 
+Metrics _getMetrics(List<String> results) {
+  final nodesList = IoK8sApiCoreV1NodeList.fromJson(
+    json.decode(results[0]),
+  );
+
+  final podsList = IoK8sApiCoreV1PodList.fromJson(
+    json.decode(results[1]),
+  );
+
+  final nodeMetricsList = ApisMetricsV1beta1NodeMetricsList.fromJson(
+    json.decode(results[2]),
+  );
+
+  var cpuAllocatable = 0.0;
+  var cpuUsage = 0.0;
+  var cpuRequests = 0.0;
+  var cpuLimits = 0.0;
+
+  var memoryAllocatable = 0.0;
+  var memoryUsage = 0.0;
+  var memoryRequests = 0.0;
+  var memoryLimits = 0.0;
+
+  var podsAllocatable = 0.0;
+  var podsUsage = 0.0;
+
+  if (nodesList != null && podsList != null && nodeMetricsList.items != null) {
+    for (var node in nodesList.items) {
+      if (node.status != null && node.status!.allocatable.containsKey('cpu')) {
+        cpuAllocatable = cpuAllocatable +
+            cpuMetricsStringToDouble(node.status!.allocatable['cpu']!);
+      }
+
+      if (node.status != null &&
+          node.status!.allocatable.containsKey('memory')) {
+        memoryAllocatable = memoryAllocatable +
+            memoryMetricsStringToDouble(node.status!.allocatable['memory']!);
+      }
+
+      if (node.status != null && node.status!.allocatable.containsKey('pods')) {
+        podsAllocatable =
+            podsAllocatable + int.parse(node.status!.allocatable['pods']!);
+      }
+    }
+
+    for (var usage in nodeMetricsList.items!) {
+      if (usage.usage != null && usage.usage!.cpu != null) {
+        cpuUsage = cpuUsage + cpuMetricsStringToDouble(usage.usage!.cpu!);
+      }
+
+      if (usage.usage != null && usage.usage!.memory != null) {
+        memoryUsage =
+            memoryUsage + memoryMetricsStringToDouble(usage.usage!.memory!);
+      }
+
+      podsUsage = podsList.items.length.toDouble();
+    }
+
+    for (var pod in podsList.items) {
+      if (pod.spec != null) {
+        for (var container in pod.spec!.containers) {
+          if (container.resources != null &&
+              container.resources!.requests.containsKey('cpu')) {
+            cpuRequests = cpuRequests +
+                cpuMetricsStringToDouble(
+                  container.resources!.requests['cpu']!,
+                );
+          }
+
+          if (container.resources != null &&
+              container.resources!.requests.containsKey('memory')) {
+            memoryRequests = memoryRequests +
+                memoryMetricsStringToDouble(
+                  container.resources!.requests['memory']!,
+                );
+          }
+
+          if (container.resources != null &&
+              container.resources!.limits.containsKey('cpu')) {
+            cpuLimits = cpuLimits +
+                cpuMetricsStringToDouble(container.resources!.limits['cpu']!);
+          }
+
+          if (container.resources != null &&
+              container.resources!.limits.containsKey('memory')) {
+            memoryLimits = memoryLimits +
+                memoryMetricsStringToDouble(
+                  container.resources!.limits['memory']!,
+                );
+          }
+        }
+      }
+    }
+  }
+
+  return Metrics(
+    metrics: {
+      MetricType.cpu: Metric(
+        allocatable: cpuAllocatable,
+        usage: cpuUsage,
+        requests: cpuRequests,
+        limits: cpuLimits,
+      ),
+      MetricType.memory: Metric(
+        allocatable: memoryAllocatable,
+        usage: memoryUsage,
+        requests: memoryRequests,
+        limits: memoryLimits,
+      ),
+      MetricType.pods: Metric(
+        allocatable: podsAllocatable,
+        usage: podsUsage,
+        requests: 0,
+        limits: 0,
+      ),
+    },
+  );
+}
+
 /// The [OverviewMetric] widget can be used to show the CPU, Memory or Pod
 /// metrics of the whole cluster or a single node in a bottom sheet. The bottom
 /// sheet contains a graph with the allocatable, usage, requests and limit
@@ -129,9 +251,6 @@ class _OverviewMetricState extends State<OverviewMetric> {
     ).getRequest(
       '/api/v1/nodes${widget.nodeName != null ? '?fieldSelector=metadata.name=${widget.nodeName}' : ''}',
     );
-    final nodesList = IoK8sApiCoreV1NodeList.fromJson(
-      nodesData,
-    );
 
     final podsData = await KubernetesService(
       cluster: cluster,
@@ -139,9 +258,6 @@ class _OverviewMetricState extends State<OverviewMetric> {
       timeout: appRepository.settings.timeout,
     ).getRequest(
       '/api/v1/pods${widget.nodeName != null ? '?fieldSelector=spec.nodeName=${widget.nodeName}' : ''}',
-    );
-    final podsList = IoK8sApiCoreV1PodList.fromJson(
-      podsData,
     );
 
     final nodeMetricsData = await KubernetesService(
@@ -151,115 +267,8 @@ class _OverviewMetricState extends State<OverviewMetric> {
     ).getRequest(
       '/apis/metrics.k8s.io/v1beta1/nodes${widget.nodeName != null ? '?fieldSelector=metadata.name=${widget.nodeName}' : ''}',
     );
-    final nodeMetricsList = ApisMetricsV1beta1NodeMetricsList.fromJson(
-      nodeMetricsData,
-    );
 
-    var cpuAllocatable = 0.0;
-    var cpuUsage = 0.0;
-    var cpuRequests = 0.0;
-    var cpuLimits = 0.0;
-
-    var memoryAllocatable = 0.0;
-    var memoryUsage = 0.0;
-    var memoryRequests = 0.0;
-    var memoryLimits = 0.0;
-
-    var podsAllocatable = 0.0;
-    var podsUsage = 0.0;
-
-    if (nodesList != null &&
-        podsList != null &&
-        nodeMetricsList.items != null) {
-      for (var node in nodesList.items) {
-        if (node.status != null &&
-            node.status!.allocatable.containsKey('cpu')) {
-          cpuAllocatable = cpuAllocatable +
-              cpuMetricsStringToDouble(node.status!.allocatable['cpu']!);
-        }
-
-        if (node.status != null &&
-            node.status!.allocatable.containsKey('memory')) {
-          memoryAllocatable = memoryAllocatable +
-              memoryMetricsStringToDouble(node.status!.allocatable['memory']!);
-        }
-
-        if (node.status != null &&
-            node.status!.allocatable.containsKey('pods')) {
-          podsAllocatable =
-              podsAllocatable + int.parse(node.status!.allocatable['pods']!);
-        }
-      }
-
-      for (var usage in nodeMetricsList.items!) {
-        if (usage.usage != null && usage.usage!.cpu != null) {
-          cpuUsage = cpuUsage + cpuMetricsStringToDouble(usage.usage!.cpu!);
-        }
-
-        if (usage.usage != null && usage.usage!.memory != null) {
-          memoryUsage =
-              memoryUsage + memoryMetricsStringToDouble(usage.usage!.memory!);
-        }
-
-        podsUsage = podsList.items.length.toDouble();
-      }
-
-      for (var pod in podsList.items) {
-        if (pod.spec != null) {
-          for (var container in pod.spec!.containers) {
-            if (container.resources != null &&
-                container.resources!.requests.containsKey('cpu')) {
-              cpuRequests = cpuRequests +
-                  cpuMetricsStringToDouble(
-                      container.resources!.requests['cpu']!);
-            }
-
-            if (container.resources != null &&
-                container.resources!.requests.containsKey('memory')) {
-              memoryRequests = memoryRequests +
-                  memoryMetricsStringToDouble(
-                      container.resources!.requests['memory']!);
-            }
-
-            if (container.resources != null &&
-                container.resources!.limits.containsKey('cpu')) {
-              cpuLimits = cpuLimits +
-                  cpuMetricsStringToDouble(container.resources!.limits['cpu']!);
-            }
-
-            if (container.resources != null &&
-                container.resources!.limits.containsKey('memory')) {
-              memoryLimits = memoryLimits +
-                  memoryMetricsStringToDouble(
-                      container.resources!.limits['memory']!);
-            }
-          }
-        }
-      }
-    }
-
-    return Metrics(
-      metrics: {
-        MetricType.cpu: Metric(
-          allocatable: cpuAllocatable,
-          usage: cpuUsage,
-          requests: cpuRequests,
-          limits: cpuLimits,
-        ),
-        MetricType.memory: Metric(
-          allocatable: memoryAllocatable,
-          usage: memoryUsage,
-          requests: memoryRequests,
-          limits: memoryLimits,
-        ),
-        MetricType.pods: Metric(
-          allocatable: podsAllocatable,
-          usage: podsUsage,
-          requests: 0,
-          limits: 0,
-        ),
-      },
-    );
+    return compute(_getMetrics, [nodesData, podsData, nodeMetricsData]);
   }
 
   /// [formatValue] format the provided [value] depending on the [metricType]
@@ -294,7 +303,7 @@ class _OverviewMetricState extends State<OverviewMetric> {
         barRods: [
           BarChartRodData(
             toY: data.metrics[widget.metricType]!.allocatable.toDouble(),
-            color: theme(context).colorPrimary,
+            color: Theme.of(context).colorScheme.primary,
             width: 25,
             borderRadius: const BorderRadius.all(
               Radius.zero,
@@ -307,7 +316,7 @@ class _OverviewMetricState extends State<OverviewMetric> {
         barRods: [
           BarChartRodData(
             toY: data.metrics[widget.metricType]!.usage.toDouble(),
-            color: theme(context).colorPrimary,
+            color: Theme.of(context).colorScheme.primary,
             width: 25,
             borderRadius: const BorderRadius.all(
               Radius.zero,
@@ -325,7 +334,7 @@ class _OverviewMetricState extends State<OverviewMetric> {
             barRods: [
               BarChartRodData(
                 toY: data.metrics[widget.metricType]!.requests.toDouble(),
-                color: theme(context).colorPrimary,
+                color: Theme.of(context).colorScheme.primary,
                 width: 25,
                 borderRadius: const BorderRadius.all(
                   Radius.zero,
@@ -338,7 +347,7 @@ class _OverviewMetricState extends State<OverviewMetric> {
             barRods: [
               BarChartRodData(
                 toY: data.metrics[widget.metricType]!.limits.toDouble(),
-                color: theme(context).colorPrimary,
+                color: Theme.of(context).colorScheme.primary,
                 width: 25,
                 borderRadius: const BorderRadius.all(
                   Radius.zero,
@@ -470,71 +479,51 @@ class _OverviewMetricState extends State<OverviewMetric> {
         Navigator.pop(context);
       },
       actionIsLoading: false,
-      child: FutureBuilder(
-        future: _futureFetchMetrics,
-        builder: (
-          BuildContext context,
-          AsyncSnapshot<Metrics> snapshot,
-        ) {
-          switch (snapshot.connectionState) {
-            case ConnectionState.none:
-            case ConnectionState.waiting:
-              return Flex(
-                direction: Axis.vertical,
-                children: [
-                  Expanded(
-                    child: Wrap(
-                      children: [
-                        CircularProgressIndicator(
-                          color: theme(context).colorPrimary,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            default:
-              if (snapshot.hasError) {
-                return Flex(
-                  direction: Axis.vertical,
-                  children: [
-                    Expanded(
-                      child: Wrap(
-                        children: [
-                          AppErrorWidget(
-                            message: 'Could not load metrics',
-                            details: snapshot.error.toString(),
-                            icon: widget.icon,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              }
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.only(
+            top: Constants.spacingMiddle,
+            bottom: Constants.spacingMiddle,
+            left: Constants.spacingMiddle,
+            right: Constants.spacingMiddle,
+          ),
+          child: FutureBuilder(
+            future: _futureFetchMetrics,
+            builder: (
+              BuildContext context,
+              AsyncSnapshot<Metrics> snapshot,
+            ) {
+              switch (snapshot.connectionState) {
+                case ConnectionState.none:
+                case ConnectionState.waiting:
+                  return CircularProgressIndicator(
+                    color: Theme.of(context).colorScheme.primary,
+                  );
+                default:
+                  if (snapshot.hasError) {
+                    return AppErrorWidget(
+                      message: 'Could not load metrics',
+                      details: snapshot.error.toString(),
+                      icon: widget.icon,
+                    );
+                  }
 
-              return ListView(
-                shrinkWrap: false,
-                children: [
-                  const SizedBox(height: Constants.spacingMiddle),
-                  Container(
-                    margin: const EdgeInsets.only(
-                      left: Constants.spacingExtraSmall,
-                      right: Constants.spacingExtraSmall,
-                    ),
+                  return Container(
                     padding: const EdgeInsets.all(
                       Constants.spacingListItemContent,
                     ),
                     decoration: BoxDecoration(
                       boxShadow: [
                         BoxShadow(
-                          color: theme(context).colorShadow,
+                          color: Theme.of(context)
+                              .extension<CustomColors>()!
+                              .shadow,
                           blurRadius: Constants.sizeBorderBlurRadius,
                           spreadRadius: Constants.sizeBorderSpreadRadius,
                           offset: const Offset(0.0, 0.0),
                         ),
                       ],
-                      color: theme(context).colorCard,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: const BorderRadius.all(
                         Radius.circular(Constants.sizeBorderRadius),
                       ),
@@ -551,8 +540,11 @@ class _OverviewMetricState extends State<OverviewMetric> {
                                 touchTooltipData: BarTouchTooltipData(
                                   fitInsideHorizontally: true,
                                   fitInsideVertically: true,
-                                  tooltipBgColor:
-                                      theme(context).colorMessageBackground,
+                                  getTooltipColor: (BarChartGroupData group) {
+                                    return Theme.of(context)
+                                        .extension<CustomColors>()!
+                                        .message;
+                                  },
                                   getTooltipItem:
                                       (group, groupIndex, rod, rodIndex) {
                                     String label;
@@ -576,8 +568,9 @@ class _OverviewMetricState extends State<OverviewMetric> {
                                     return BarTooltipItem(
                                       '$label\n',
                                       TextStyle(
-                                        color: theme(context)
-                                            .colorMessageForeground,
+                                        color: Theme.of(context)
+                                            .extension<CustomColors>()!
+                                            .onMessage,
                                         fontWeight: FontWeight.normal,
                                         fontSize: 14,
                                       ),
@@ -585,8 +578,9 @@ class _OverviewMetricState extends State<OverviewMetric> {
                                         TextSpan(
                                           text: formatValue(rod.toY),
                                           style: TextStyle(
-                                            color: theme(context)
-                                                .colorMessageForeground,
+                                            color: Theme.of(context)
+                                                .extension<CustomColors>()!
+                                                .onMessage,
                                             fontSize: 14,
                                             fontWeight: FontWeight.normal,
                                           ),
@@ -649,14 +643,18 @@ class _OverviewMetricState extends State<OverviewMetric> {
                                 show: true,
                                 getDrawingHorizontalLine: (value) {
                                   return FlLine(
-                                    color: theme(context).colorTextSecondary,
+                                    color: Theme.of(context)
+                                        .extension<CustomColors>()!
+                                        .textSecondary,
                                     strokeWidth: 0.4,
                                     dashArray: [8, 4],
                                   );
                                 },
                                 getDrawingVerticalLine: (value) {
                                   return FlLine(
-                                    color: theme(context).colorTextSecondary,
+                                    color: Theme.of(context)
+                                        .extension<CustomColors>()!
+                                        .textSecondary,
                                     strokeWidth: 0.4,
                                     dashArray: [8, 4],
                                   );
@@ -669,12 +667,11 @@ class _OverviewMetricState extends State<OverviewMetric> {
                         ...buildLegend(snapshot.data!),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: Constants.spacingMiddle),
-                ],
-              );
-          }
-        },
+                  );
+              }
+            },
+          ),
+        ),
       ),
     );
   }

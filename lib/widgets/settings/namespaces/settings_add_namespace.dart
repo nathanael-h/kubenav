@@ -39,51 +39,72 @@ class _SettingsAddNamespaceState extends State<SettingsAddNamespace> {
 
     return AppBottomSheetWidget(
       title: 'Add Namespace',
-      subtitle: 'Add one of your favorite namespaces for quick access',
+      subtitle: 'Add one of your favorite Namespaces for faster access',
       icon: Icons.difference,
       closePressed: () {
         Navigator.pop(context);
       },
       actionText: 'Add Namespace',
-      actionPressed: () {
+      actionPressed: () async {
         if (_namespaceFormKey.currentState != null &&
             _namespaceFormKey.currentState!.validate()) {
-          appRepository.addNamespace(_namespaceController.text);
-          Navigator.pop(context);
+          await appRepository.addNamespace(
+            _namespaceController.text,
+          );
+
+          if (context.mounted) {
+            Navigator.pop(context);
+          }
         }
       },
       actionIsLoading: false,
       child: Form(
         key: _namespaceFormKey,
-        child: ListView(
-          shrinkWrap: false,
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: Text(
-                'Enter the name of one of your favorite namespaces for quick access:',
-              ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: Constants.spacingMiddle,
+              bottom: Constants.spacingMiddle,
+              left: Constants.spacingMiddle,
+              right: Constants.spacingMiddle,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _namespaceController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Namespace',
+            child: Column(
+              children: [
+                const Text(
+                  'Enter the name of one of your favorite namespaces for faster access:',
                 ),
-                validator: _validator,
-              ),
+                Padding(
+                  padding: const EdgeInsets.only(
+                    top: Constants.spacingMiddle,
+                  ),
+                  child: TextFormField(
+                    controller: _namespaceController,
+                    keyboardType: TextInputType.text,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    maxLines: 1,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Namespace',
+                    ),
+                    validator: _validator,
+                    onFieldSubmitted: (String value) async {
+                      if (_namespaceFormKey.currentState != null &&
+                          _namespaceFormKey.currentState!.validate()) {
+                        await appRepository.addNamespace(
+                          _namespaceController.text,
+                        );
+
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:http/http.dart' as http;
@@ -9,8 +9,6 @@ import 'package:http/http.dart' as http;
 import 'package:kubenav/models/cluster.dart';
 import 'package:kubenav/models/plugins/helm.dart';
 import 'package:kubenav/models/plugins/prometheus.dart';
-import 'package:kubenav/services/kubenav_desktop.dart';
-import 'package:kubenav/services/kubenav_mobile.dart';
 import 'package:kubenav/utils/logger.dart';
 
 /// [KubernetesService] implements a service to interactiv with the Kubernetes
@@ -32,39 +30,69 @@ class KubernetesService {
     required this.timeout,
   });
 
+  /// [kubernetesRequest] can be used to make an request against the Kubernetes
+  /// API server
+  Future<String> kubernetesRequest(
+    Cluster cluster,
+    String proxy,
+    int timeout,
+    String method,
+    String url,
+    String body,
+  ) async {
+    Logger.log(
+      'KubernetesService kubernetesRequest',
+      'Run kubernetesRequest function',
+      '${cluster.name}, $method, $url, $body',
+    );
+
+    final String result = await platform.invokeMethod(
+      'kubernetesRequest',
+      <String, dynamic>{
+        'clusterServer': cluster.clusterServer,
+        'clusterCertificateAuthorityData':
+            cluster.clusterCertificateAuthorityData,
+        'clusterInsecureSkipTLSVerify': cluster.clusterInsecureSkipTLSVerify,
+        'userClientCertificateData': cluster.userClientCertificateData,
+        'userClientKeyData': cluster.userClientKeyData,
+        'userToken': cluster.userToken,
+        'userUsername': cluster.userUsername,
+        'userPassword': cluster.userPassword,
+        'proxy': proxy,
+        'timeout': timeout,
+        'requestMethod': method,
+        'requestURL': url,
+        'requestBody': body,
+      },
+    );
+
+    Logger.log(
+      'KubernetesService kubernetesRequest',
+      'Result of the kubernetesRequest function',
+      result,
+    );
+
+    return result;
+  }
+
   /// [checkHealth] can be used to check the health of a Kubernetes cluster. The
   /// health of a cluster can be checked by calling the `/readyz` endpoint of
   /// the cluster. If the cluster is healthy it should return 200, if it isn't
   /// healthy it returns an other response code.
   Future<bool> checkHealth() async {
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        final result = await KubenavDesktop().kubernetesRequest(
-          cluster.name,
-          proxy,
-          timeout,
-          'GET',
-          '/readyz',
-          '',
-        );
-        if (result == 'ok') {
-          return true;
-        }
-        return false;
-      } else {
-        final result = await KubenavMobile().kubernetesRequest(
-          cluster,
-          proxy,
-          timeout,
-          'GET',
-          '/readyz',
-          '',
-        );
-        if (result == 'ok') {
-          return true;
-        }
-        return false;
+      final result = await kubernetesRequest(
+        cluster,
+        proxy,
+        timeout,
+        'GET',
+        '/readyz',
+        '',
+      );
+      if (result == 'ok') {
+        return true;
       }
+      return false;
     } catch (err) {
       Logger.log(
         'KubernetesService checkHealth',
@@ -79,29 +107,17 @@ class KubernetesService {
   /// cluster. For that a user can pass in the [url], which should be called,
   /// the function then returns an error or a json object of the response from
   /// the Kubernetes API.
-  Future<Map<String, dynamic>> getRequest(String url) async {
+  Future<String> getRequest(String url) async {
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        final result = await KubenavDesktop().kubernetesRequest(
-          cluster.name,
-          proxy,
-          timeout,
-          'GET',
-          url,
-          '',
-        );
-        return json.decode(result);
-      } else {
-        final result = await KubenavMobile().kubernetesRequest(
-          cluster,
-          proxy,
-          timeout,
-          'GET',
-          url,
-          '',
-        );
-        return json.decode(result);
-      }
+      final result = await kubernetesRequest(
+        cluster,
+        proxy,
+        timeout,
+        'GET',
+        url,
+        '',
+      );
+      return result;
     } catch (err) {
       Logger.log(
         'KubernetesService getRequest',
@@ -119,27 +135,15 @@ class KubernetesService {
   /// in case there was one.
   Future<void> deleteRequest(String url, String? body) async {
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        await KubenavDesktop().kubernetesRequest(
-          cluster.name,
-          proxy,
-          timeout,
-          'DELETE',
-          url,
-          body ?? '',
-        );
-        return;
-      } else {
-        await KubenavMobile().kubernetesRequest(
-          cluster,
-          proxy,
-          timeout,
-          'DELETE',
-          url,
-          body ?? '',
-        );
-        return;
-      }
+      await kubernetesRequest(
+        cluster,
+        proxy,
+        timeout,
+        'DELETE',
+        url,
+        body ?? '',
+      );
+      return;
     } catch (err) {
       Logger.log(
         'KubernetesService deleteRequest',
@@ -156,27 +160,15 @@ class KubernetesService {
   /// json patch.
   Future<void> patchRequest(String url, String body) async {
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        await KubenavDesktop().kubernetesRequest(
-          cluster.name,
-          proxy,
-          timeout,
-          'PATCH',
-          url,
-          body,
-        );
-        return;
-      } else {
-        await KubenavMobile().kubernetesRequest(
-          cluster,
-          proxy,
-          timeout,
-          'PATCH',
-          url,
-          body,
-        );
-        return;
-      }
+      await kubernetesRequest(
+        cluster,
+        proxy,
+        timeout,
+        'PATCH',
+        url,
+        body,
+      );
+      return;
     } catch (err) {
       Logger.log(
         'KubernetesService patchRequest',
@@ -193,27 +185,15 @@ class KubernetesService {
   /// Kubernetes manifest which should be created.
   Future<void> postRequest(String url, String body) async {
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        await KubenavDesktop().kubernetesRequest(
-          cluster.name,
-          proxy,
-          timeout,
-          'POST',
-          url,
-          body,
-        );
-        return;
-      } else {
-        await KubenavMobile().kubernetesRequest(
-          cluster,
-          proxy,
-          timeout,
-          'POST',
-          url,
-          body,
-        );
-        return;
-      }
+      await kubernetesRequest(
+        cluster,
+        proxy,
+        timeout,
+        'POST',
+        url,
+        body,
+      );
+      return;
     } catch (err) {
       Logger.log(
         'KubernetesService postRequest',
@@ -236,35 +216,43 @@ class KubernetesService {
     bool previous,
   ) async {
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        final result = await KubenavDesktop().kubernetesGetLogs(
-          cluster.name,
-          proxy,
-          timeout,
-          names,
-          namespace,
-          container,
-          since,
-          filter,
-          previous,
-        );
-        Map<String, dynamic> jsonData = json.decode(result);
-        return jsonData['logs'] ?? [];
-      } else {
-        final result = await KubenavMobile().kubernetesGetLogs(
-          cluster,
-          proxy,
-          timeout,
-          names,
-          namespace,
-          container,
-          since,
-          filter,
-          previous,
-        );
-        Map<String, dynamic> jsonData = json.decode(result);
-        return jsonData['logs'] ?? [];
-      }
+      Logger.log(
+        'KubernetesService kubernetesGetLogs',
+        'Run kubernetesGetLogs function',
+        '${cluster.name}, $names, $namespace, $container, $since, $filter, $previous',
+      );
+
+      final String result = await platform.invokeMethod(
+        'kubernetesGetLogs',
+        <String, dynamic>{
+          'clusterServer': cluster.clusterServer,
+          'clusterCertificateAuthorityData':
+              cluster.clusterCertificateAuthorityData,
+          'clusterInsecureSkipTLSVerify': cluster.clusterInsecureSkipTLSVerify,
+          'userClientCertificateData': cluster.userClientCertificateData,
+          'userClientKeyData': cluster.userClientKeyData,
+          'userToken': cluster.userToken,
+          'userUsername': cluster.userUsername,
+          'userPassword': cluster.userPassword,
+          'proxy': proxy,
+          'timeout': timeout,
+          'names': names,
+          'namespace': namespace,
+          'container': container,
+          'since': since,
+          'filter': filter,
+          'previous': previous,
+        },
+      );
+
+      Logger.log(
+        'KubernetesService kubernetesGetLogs',
+        'Get logs request was ok',
+        result,
+      );
+
+      Map<String, dynamic> jsonData = json.decode(result);
+      return jsonData['logs'] ?? [];
     } catch (err) {
       Logger.log(
         'KubernetesService getLogs',
@@ -288,15 +276,19 @@ class KubernetesService {
       if (isServerHealthy) {
         return true;
       } else {
-        if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-          await KubenavDesktop().kubernetesStartServer();
-          await Future.delayed(const Duration(seconds: 3));
-          return await _checkServerHealth();
-        } else {
-          await KubenavMobile().kubernetesStartServer();
-          await Future.delayed(const Duration(seconds: 3));
-          return await _checkServerHealth();
-        }
+        Logger.log(
+          'KubernetesService kubernetesStartServer',
+          'Run kubernetesStartServer function',
+        );
+
+        await platform.invokeMethod('kubernetesStartServer');
+
+        Logger.log(
+          'KubernetesService startServer',
+          'Internal http server was started',
+        );
+        await Future.delayed(const Duration(seconds: 3));
+        return await _checkServerHealth();
       }
     } catch (err) {
       Logger.log(
@@ -473,143 +465,252 @@ class KubernetesService {
     }
   }
 
-  /// [helmListCharts] lists all Helm charts in the provided namespace.
-  Future<List<Release>> helmListCharts(String namespace) async {
+  /// [helmListReleases] lists all Helm releases in the provided namespace.
+  Future<List<Release>> helmListReleases(String namespace) async {
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        final result = await KubenavDesktop().helmListCharts(
-          cluster.name,
-          proxy,
-          timeout,
-          namespace,
-        );
-        if (result == 'null') {
-          return [];
-        }
+      Logger.log(
+        'KubernetesService helmListReleases',
+        'Run helmListReleases function',
+        '${cluster.name}, $namespace',
+      );
 
-        List<dynamic> jsonData = json.decode(result);
-        final releases = <Release>[];
-        for (var release in jsonData) {
-          releases.add(Release.fromJson(release));
-        }
-        return releases;
-      } else {
-        final result = await KubenavMobile().helmListCharts(
-          cluster,
-          proxy,
-          timeout,
-          namespace,
-        );
-        if (result == 'null') {
-          return [];
-        }
+      final String result = await platform.invokeMethod(
+        'helmListReleases',
+        <String, dynamic>{
+          'clusterServer': cluster.clusterServer,
+          'clusterCertificateAuthorityData':
+              cluster.clusterCertificateAuthorityData,
+          'clusterInsecureSkipTLSVerify': cluster.clusterInsecureSkipTLSVerify,
+          'userClientCertificateData': cluster.userClientCertificateData,
+          'userClientKeyData': cluster.userClientKeyData,
+          'userToken': cluster.userToken,
+          'userUsername': cluster.userUsername,
+          'userPassword': cluster.userPassword,
+          'proxy': proxy,
+          'timeout': timeout,
+          'namespace': namespace,
+        },
+      );
 
-        List<dynamic> jsonData = json.decode(result);
-        final releases = <Release>[];
-        for (var release in jsonData) {
-          releases.add(Release.fromJson(release));
-        }
-        return releases;
+      Logger.log(
+        'KubernetesService helmListReleases',
+        'Helm Releases',
+        result,
+      );
+
+      if (result == 'null') {
+        return [];
       }
+
+      return compute(_decodeHelmListReleases, result);
     } catch (err) {
       Logger.log(
-        'KubernetesService helmListCharts',
-        'List Helm charts failed',
+        'KubernetesService helmListReleases',
+        'Failed to Get Helm Releases',
         err,
       );
       rethrow;
     }
   }
 
-  /// [helmGetChart] retruns the provided [version] for a Helm chart with the
-  /// provided [name] in the provided [namespace].
-  Future<Release> helmGetChart(
+  /// [helmGetRelease] retruns the provided [version] for a Helm release with
+  /// the provided [name] in the provided [namespace].
+  Future<Release> helmGetRelease(
     String namespace,
     String name,
     int version,
   ) async {
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        final result = await KubenavDesktop().helmGetChart(
-          cluster.name,
-          proxy,
-          timeout,
-          namespace,
-          name,
-          version,
-        );
-        return Release.fromJson(json.decode(result));
-      } else {
-        final result = await KubenavMobile().helmGetChart(
-          cluster,
-          proxy,
-          timeout,
-          namespace,
-          name,
-          version,
-        );
-        Map<String, dynamic> jsonData = json.decode(result);
-        Release release = Release.fromJson(jsonData);
-        return release;
-      }
+      Logger.log(
+        'KubernetesService helmGetRelease',
+        'Run helmGetRelease function',
+        '${cluster.name}, $namespace, $name, $version',
+      );
+      final String result = await platform.invokeMethod(
+        'helmGetRelease',
+        <String, dynamic>{
+          'clusterServer': cluster.clusterServer,
+          'clusterCertificateAuthorityData':
+              cluster.clusterCertificateAuthorityData,
+          'clusterInsecureSkipTLSVerify': cluster.clusterInsecureSkipTLSVerify,
+          'userClientCertificateData': cluster.userClientCertificateData,
+          'userClientKeyData': cluster.userClientKeyData,
+          'userToken': cluster.userToken,
+          'userUsername': cluster.userUsername,
+          'userPassword': cluster.userPassword,
+          'proxy': proxy,
+          'timeout': timeout,
+          'namespace': namespace,
+          'name': name,
+          'version': version,
+        },
+      );
+
+      Logger.log(
+        'KubernetesService helmGetRelease',
+        'Helm Release',
+        result,
+      );
+
+      return compute(_decodeHelmGetRelease, result);
     } catch (err) {
       Logger.log(
-        'KubernetesService helmGetChart',
-        'Get Helm chart failed',
+        'KubernetesService helmGetRelease',
+        'Failed to Get Helm Release',
         err,
       );
       rethrow;
     }
   }
 
-  /// [helmGetHistory] returns the history for the Helm chart with the provided
-  /// [name] and [namespace].
-  Future<List<Release>> helmGetHistory(
+  /// [helmListReleaseHistory] returns the history for the Helm release with the
+  /// provided [name] and [namespace].
+  Future<List<Release>> helmListReleaseHistory(
     String namespace,
     String name,
   ) async {
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        final result = await KubenavDesktop().helmGetHistory(
-          cluster.name,
-          proxy,
-          timeout,
-          namespace,
-          name,
-        );
-        if (result == 'null') {
-          return [];
-        }
+      Logger.log(
+        'KubernetesService helmListReleaseHistory',
+        'Run helmListReleaseHistory function',
+        '${cluster.name}, $namespace, $name',
+      );
 
-        List<dynamic> jsonData = json.decode(result);
-        final releases = <Release>[];
-        for (var release in jsonData) {
-          releases.add(Release.fromJson(release));
-        }
-        return releases;
-      } else {
-        final result = await KubenavMobile().helmGetHistory(
-          cluster,
-          proxy,
-          timeout,
-          namespace,
-          name,
-        );
-        if (result == 'null') {
-          return [];
-        }
+      final String result = await platform.invokeMethod(
+        'helmListReleaseHistory',
+        <String, dynamic>{
+          'clusterServer': cluster.clusterServer,
+          'clusterCertificateAuthorityData':
+              cluster.clusterCertificateAuthorityData,
+          'clusterInsecureSkipTLSVerify': cluster.clusterInsecureSkipTLSVerify,
+          'userClientCertificateData': cluster.userClientCertificateData,
+          'userClientKeyData': cluster.userClientKeyData,
+          'userToken': cluster.userToken,
+          'userUsername': cluster.userUsername,
+          'userPassword': cluster.userPassword,
+          'proxy': proxy,
+          'timeout': timeout,
+          'namespace': namespace,
+          'name': name,
+        },
+      );
 
-        List<dynamic> jsonData = json.decode(result);
-        final releases = <Release>[];
-        for (var release in jsonData) {
-          releases.add(Release.fromJson(release));
-        }
-        return releases;
+      Logger.log(
+        'KubernetesService helmListReleaseHistory',
+        'Helm Release History',
+        result,
+      );
+
+      if (result == 'null') {
+        return [];
       }
+
+      return compute(_decodeHelmListReleases, result);
     } catch (err) {
       Logger.log(
-        'KubernetesService helmGetHistory',
-        'Get Helm history failed',
+        'KubernetesService helmListReleaseHistory',
+        'Failed to Get Helm Release History',
+        err,
+      );
+      rethrow;
+    }
+  }
+
+  /// [helmRollbackRelease] rolls back the Helm release with the provided [name]
+  /// and [namespace] to the provided [version].
+  Future<void> helmRollbackRelease(
+    String namespace,
+    String name,
+    int version,
+    String options,
+  ) async {
+    try {
+      Logger.log(
+        'KubernetesService helmRollbackRelease',
+        'Run helmRollbackRelease function',
+        '${cluster.name}, $namespace, $name, $version',
+      );
+
+      await platform.invokeMethod(
+        'helmRollbackRelease',
+        <String, dynamic>{
+          'clusterServer': cluster.clusterServer,
+          'clusterCertificateAuthorityData':
+              cluster.clusterCertificateAuthorityData,
+          'clusterInsecureSkipTLSVerify': cluster.clusterInsecureSkipTLSVerify,
+          'userClientCertificateData': cluster.userClientCertificateData,
+          'userClientKeyData': cluster.userClientKeyData,
+          'userToken': cluster.userToken,
+          'userUsername': cluster.userUsername,
+          'userPassword': cluster.userPassword,
+          'proxy': proxy,
+          'timeout': timeout,
+          'namespace': namespace,
+          'name': name,
+          'version': version,
+          'options': options,
+        },
+      );
+
+      Logger.log(
+        'KubernetesService helmRollbackRelease',
+        'Rollback Succeeded',
+      );
+
+      return;
+    } catch (err) {
+      Logger.log(
+        'KubernetesService helmRollbackRelease',
+        'Rollback Failed',
+        err,
+      );
+      rethrow;
+    }
+  }
+
+  Future<String> helmUninstallRelease(
+    String namespace,
+    String name,
+    String options,
+  ) async {
+    try {
+      Logger.log(
+        'KubernetesService helmUninstallRelease',
+        'Run helmUninstallRelease function',
+        '${cluster.name}, $namespace, $name',
+      );
+
+      final message = await platform.invokeMethod(
+        'helmUninstallRelease',
+        <String, dynamic>{
+          'clusterServer': cluster.clusterServer,
+          'clusterCertificateAuthorityData':
+              cluster.clusterCertificateAuthorityData,
+          'clusterInsecureSkipTLSVerify': cluster.clusterInsecureSkipTLSVerify,
+          'userClientCertificateData': cluster.userClientCertificateData,
+          'userClientKeyData': cluster.userClientKeyData,
+          'userToken': cluster.userToken,
+          'userUsername': cluster.userUsername,
+          'userPassword': cluster.userPassword,
+          'proxy': proxy,
+          'timeout': timeout,
+          'namespace': namespace,
+          'name': name,
+          'options': options,
+        },
+      );
+
+      Logger.log(
+        'KubernetesService helmUninstallRelease',
+        'Uninstall Succeeded',
+        message,
+      );
+
+      return message;
+    } catch (err) {
+      Logger.log(
+        'KubernetesService helmUninstallRelease',
+        'Uninstall Failed',
         err,
       );
       rethrow;
@@ -634,41 +735,41 @@ class KubernetesService {
         timeEnd: timeEnd,
       ).toString();
 
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        final result = await KubenavDesktop().prometheusGetData(
-          cluster.name,
-          proxy,
-          timeout,
-          request,
-        );
-        if (result == 'null') {
-          return [];
-        }
+      Logger.log(
+        'KubernetesService prometheusGetData',
+        'Run prometheusGetData function',
+        '${cluster.name}, $request',
+      );
 
-        List<dynamic> jsonData = json.decode(result);
-        final metrics = <Metric>[];
-        for (var metric in jsonData) {
-          metrics.add(Metric.fromJson(metric));
-        }
-        return metrics;
-      } else {
-        final result = await KubenavMobile().prometheusGetData(
-          cluster,
-          proxy,
-          timeout,
-          request,
-        );
-        if (result == 'null') {
-          return [];
-        }
+      final String result = await platform.invokeMethod(
+        'prometheusGetData',
+        <String, dynamic>{
+          'clusterServer': cluster.clusterServer,
+          'clusterCertificateAuthorityData':
+              cluster.clusterCertificateAuthorityData,
+          'clusterInsecureSkipTLSVerify': cluster.clusterInsecureSkipTLSVerify,
+          'userClientCertificateData': cluster.userClientCertificateData,
+          'userClientKeyData': cluster.userClientKeyData,
+          'userToken': cluster.userToken,
+          'userUsername': cluster.userUsername,
+          'userPassword': cluster.userPassword,
+          'proxy': proxy,
+          'timeout': timeout,
+          'request': request,
+        },
+      );
 
-        List<dynamic> jsonData = json.decode(result);
-        final metrics = <Metric>[];
-        for (var metric in jsonData) {
-          metrics.add(Metric.fromJson(metric));
-        }
-        return metrics;
+      Logger.log(
+        'KubernetesService prometheusGetData',
+        'List Helm charts was ok',
+        result,
+      );
+
+      if (result == 'null') {
+        return [];
       }
+
+      return await compute(_decodePrometheusGetData, result);
     } catch (err) {
       Logger.log(
         'KubernetesService prometheusGetData',
@@ -678,4 +779,38 @@ class KubernetesService {
       rethrow;
     }
   }
+}
+
+/// [_decodePrometheusGetData] is a helper function to decode the result of the
+/// `prometheusGetData` function, within the `compute` function. The functions
+/// takes the [result] as parameter and returns a list of [Metric] objects.
+List<Metric> _decodePrometheusGetData(String result) {
+  List<dynamic> jsonData = json.decode(result);
+  final metrics = <Metric>[];
+  for (var metric in jsonData) {
+    metrics.add(Metric.fromJson(metric));
+  }
+  return metrics;
+}
+
+/// [_decodeHelmListReleases] is a helper function to decode the result of the
+/// `helmListReleases` and `helmListReleaseHistory` function, within the
+/// `compute` function. The functions takes the [result] as parameter and
+/// returns a list of [Release] objects.
+List<Release> _decodeHelmListReleases(String result) {
+  List<dynamic> jsonData = json.decode(result);
+  final releases = <Release>[];
+  for (var release in jsonData) {
+    releases.add(Release.fromJson(release));
+  }
+  return releases;
+}
+
+/// [_decodeHelmGetRelease] is a helper function to decode the result of the
+/// `helmGetRelease` function, within the `compute` function. The functions
+/// takes the [result] as parameter and returns a [Release] object.
+Release _decodeHelmGetRelease(String result) {
+  Map<String, dynamic> jsonData = json.decode(result);
+  Release release = Release.fromJson(jsonData);
+  return release;
 }

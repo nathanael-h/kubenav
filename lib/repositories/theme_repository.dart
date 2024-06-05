@@ -1,22 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import 'package:provider/provider.dart';
-
 import 'package:kubenav/utils/logger.dart';
 import 'package:kubenav/utils/storage.dart';
-
-/// [theme] is a helper function which returns the [ThemeSettings] for the users
-/// currently selected team.
-///
-/// NOTE: WE CAN NOT LISTEN TO CHANGES HERE, THIS WILL BREAK ALL OUR CHARTS AND
-/// SOME OTHER ACTIONS LIKE DELETING RESOURCES.
-ThemeSettings theme(BuildContext context) {
-  return Provider.of<ThemeRepository>(
-    context,
-    listen: false,
-  ).theme;
-}
 
 /// [ThemeName] is a enum value which contains all available themes for the app.
 /// All defined themes must also have a [ThemeSettings] object which is returned
@@ -82,7 +68,7 @@ class ThemeRepository with ChangeNotifier {
     } catch (err) {
       Logger.log(
         'ThemeRepository _save',
-        'Could not save theme',
+        'Failed to Save Theme',
         err,
       );
     }
@@ -102,7 +88,7 @@ class ThemeRepository with ChangeNotifier {
     } catch (err) {
       Logger.log(
         'ThemeRepository _init',
-        'Could not load theme',
+        'Failed to Load Theme',
         err,
       );
     }
@@ -110,91 +96,15 @@ class ThemeRepository with ChangeNotifier {
 
   /// [theme] returns the correct [ThemeSettings] for the users selected
   /// [_themeName].
-  ThemeSettings get theme {
+  ThemeMode get themeMode {
     if (_themeName == ThemeName.light) {
-      return _lightTheme;
+      return ThemeMode.light;
     }
 
     if (_themeName == ThemeName.dark) {
-      return _darkTheme;
+      return ThemeMode.dark;
     }
 
-    return isDarkTheme() ? _darkTheme : _lightTheme;
-  }
-
-  void notify() {
-    notifyListeners();
+    return ThemeMode.system;
   }
 }
-
-/// The [ThemeSettings] model, defines all properties which can be set by a
-/// theme. The [ThemeSettings] for each [ThemeName] can be get via the
-/// [ThemeRepository.theme] getter.
-class ThemeSettings {
-  Brightness brightness;
-
-  Color colorPrimary;
-  Color colorOnPrimary;
-  Color colorBackground;
-  Color colorInputDecoration;
-  Color colorSuccess;
-  Color colorWarning;
-  Color colorDanger;
-  Color colorTextPrimary;
-  Color colorTextSecondary;
-  Color colorCard;
-  Color colorShadow;
-  Color colorMessageBackground;
-  Color colorMessageForeground;
-
-  ThemeSettings({
-    required this.brightness,
-    required this.colorPrimary,
-    required this.colorOnPrimary,
-    required this.colorBackground,
-    required this.colorInputDecoration,
-    required this.colorSuccess,
-    required this.colorWarning,
-    required this.colorDanger,
-    required this.colorTextPrimary,
-    required this.colorTextSecondary,
-    required this.colorCard,
-    required this.colorShadow,
-    required this.colorMessageBackground,
-    required this.colorMessageForeground,
-  });
-}
-
-final _lightTheme = ThemeSettings(
-  brightness: Brightness.light,
-  colorPrimary: const Color(0xff326ce5),
-  colorOnPrimary: Colors.white,
-  colorBackground: Colors.white,
-  colorInputDecoration: const Color(0xFF2E3033),
-  colorSuccess: Colors.green,
-  colorWarning: Colors.yellow,
-  colorDanger: Colors.red,
-  colorTextPrimary: const Color(0xFF2E3033),
-  colorTextSecondary: const Color(0xFF757575),
-  colorCard: Colors.white,
-  colorShadow: Colors.grey.withOpacity(0.2),
-  colorMessageBackground: Colors.black,
-  colorMessageForeground: Colors.white,
-);
-
-final _darkTheme = ThemeSettings(
-  brightness: Brightness.dark,
-  colorPrimary: const Color(0xff326ce5),
-  colorOnPrimary: Colors.white,
-  colorBackground: const Color(0xff22272e),
-  colorInputDecoration: const Color(0xffcdd9e5),
-  colorSuccess: Colors.green,
-  colorWarning: Colors.yellow,
-  colorDanger: Colors.red,
-  colorTextPrimary: const Color(0xffcdd9e5),
-  colorTextSecondary: const Color(0xffadbac7),
-  colorCard: const Color(0xff22272e),
-  colorShadow: Colors.grey.withOpacity(0.1),
-  colorMessageBackground: const Color(0xff2d333b),
-  colorMessageForeground: const Color(0xffcdd9e5),
-);

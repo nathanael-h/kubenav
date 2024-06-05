@@ -5,12 +5,12 @@ import 'package:uuid/uuid.dart';
 
 import 'package:kubenav/models/cluster_provider.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/services/providers/oidc_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/logger.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/settings/clusters/settings_add_cluster_oidc.dart';
 import 'package:kubenav/widgets/shared/app_bottom_sheet_widget.dart';
 
@@ -81,15 +81,16 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
     } catch (err) {
       Logger.log(
         'SettingsOIDCProvider signIn',
-        'Could not open sign in url',
+        'Failed to Open Sign In Url',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not generate and open sign in url',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Open Sign In Url',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -111,15 +112,16 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
     } catch (err) {
       Logger.log(
         'SettingsOIDCProvider _initDeviceFlow',
-        'Could not initialize device flow',
+        'Failed to Initialize Device Flow',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not initialize device flow',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Initialize Device Flow',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -134,19 +136,20 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
     } catch (err) {
       Logger.log(
         'SettingsOIDCProvider _verfiyDeviceFlow',
-        'Could not verify device flow',
+        'Failed to Verify Device',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not verify device flow',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Verify Device',
+          err.toString(),
+        );
+      }
     }
   }
 
-  Future<void> _saveProvider(BuildContext context) async {
+  Future<void> _saveProvider() async {
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: false,
@@ -237,18 +240,19 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
         } catch (err) {
           Logger.log(
             'OIDCProviderConfigController _saveProvider',
-            'Could not save provider configuration',
+            'Failed to Save Provider Configuration',
             err,
           );
           setState(() {
             _isLoading = false;
           });
-          if (!context.mounted) return;
-          showSnackbar(
-            context,
-            'Could not save provider configuration',
-            err.toString(),
-          );
+          if (mounted) {
+            showSnackbar(
+              context,
+              'Failed to Save Provider Configuration',
+              err.toString(),
+            );
+          }
         }
       } else {
         /// Handle the standard authentication flow. For that we have to get a
@@ -368,18 +372,19 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
         } catch (err) {
           Logger.log(
             'OIDCProviderConfigController _saveProvider',
-            'Could not save provider configuration',
+            'Failed to Save Provider Configuration',
             err,
           );
           setState(() {
             _isLoading = false;
           });
-          if (!context.mounted) return;
-          showSnackbar(
-            context,
-            'Could not save provider configuration',
-            err.toString(),
-          );
+          if (mounted) {
+            showSnackbar(
+              context,
+              'Failed to Save Provider Configuration',
+              err.toString(),
+            );
+          }
         }
       }
     }
@@ -388,8 +393,8 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
   Widget _buildPkceMethod() {
     if (_pkceMethod == '') {
       return Padding(
-        padding: const EdgeInsets.symmetric(
-          vertical: Constants.spacingSmall,
+        padding: const EdgeInsets.only(
+          top: Constants.spacingMiddle,
         ),
         child: TextFormField(
           controller: _clientSecretController,
@@ -411,77 +416,61 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
   List<Widget> _buildDeviceAuth() {
     if (_deviceAuthData != null) {
       return [
-        const Padding(
-          padding: EdgeInsets.symmetric(
-            vertical: Constants.spacingSmall,
+        const SizedBox(height: Constants.spacingMiddle),
+        const Text(
+          'Copy the code shown in the input field from below and click the verify button to verify your device.',
+        ),
+        const SizedBox(height: Constants.spacingMiddle),
+        TextFormField(
+          initialValue: _deviceAuthData?.userCode ?? '',
+          keyboardType: TextInputType.text,
+          autocorrect: false,
+          enableSuggestions: false,
+          maxLines: 1,
+          readOnly: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            labelText: 'Code',
           ),
+        ),
+        const SizedBox(height: Constants.spacingMiddle),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            minimumSize: const Size.fromHeight(40),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(
+                Constants.sizeBorderRadius,
+              ),
+            ),
+          ),
+          onPressed: _verifyDeviceFlow,
           child: Text(
-            'Copy the code shown in the input field from below and click the verify button to verify your device.',
+            'Verify',
+            style: primaryTextStyle(
+              context,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
+            textAlign: TextAlign.center,
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            vertical: Constants.spacingSmall,
-          ),
-          child: TextFormField(
-            initialValue: _deviceAuthData?.userCode ?? '',
-            keyboardType: TextInputType.text,
-            autocorrect: false,
-            enableSuggestions: false,
-            maxLines: 1,
-            readOnly: true,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              labelText: 'Code',
+        const SizedBox(height: Constants.spacingMiddle),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Text('Use Access Token instead of ID Token'),
+            Switch(
+              activeColor: Theme.of(context).colorScheme.primary,
+              onChanged: (val) => {
+                setState(() {
+                  _useAccessToken = !_useAccessToken;
+                }),
+              },
+              value: _useAccessToken,
             ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            vertical: Constants.spacingSmall,
-          ),
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme(context).colorPrimary,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(40),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(
-                  Constants.sizeBorderRadius,
-                ),
-              ),
-            ),
-            onPressed: _verifyDeviceFlow,
-            child: Text(
-              'Verify',
-              style: primaryTextStyle(
-                context,
-                color: Colors.white,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            vertical: Constants.spacingSmall,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text('Use Access Token instead of ID Token'),
-              Switch(
-                activeColor: theme(context).colorPrimary,
-                onChanged: (val) => {
-                  setState(() {
-                    _useAccessToken = !_useAccessToken;
-                  }),
-                },
-                value: _useAccessToken,
-              ),
-            ],
-          ),
+          ],
         ),
       ];
     } else {
@@ -495,46 +484,38 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
   List<Widget> _buildFormForFlow() {
     if (_flow == OIDCFlow.device) {
       return [
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            vertical: Constants.spacingSmall,
-          ),
-          child: TextFormField(
-            controller: _scopesController,
-            keyboardType: TextInputType.text,
-            autocorrect: false,
-            enableSuggestions: false,
-            maxLines: 1,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              labelText: 'Scopes (optional)',
-            ),
+        const SizedBox(height: Constants.spacingMiddle),
+        TextFormField(
+          controller: _scopesController,
+          keyboardType: TextInputType.text,
+          autocorrect: false,
+          enableSuggestions: false,
+          maxLines: 1,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            labelText: 'Scopes (optional)',
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            vertical: Constants.spacingSmall,
+        const SizedBox(height: Constants.spacingMiddle),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            minimumSize: const Size.fromHeight(40),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(
+                Constants.sizeBorderRadius,
+              ),
+            ),
           ),
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme(context).colorPrimary,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(40),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(
-                  Constants.sizeBorderRadius,
-                ),
-              ),
+          onPressed: _initDeviceFlow,
+          child: Text(
+            'Initialize Device Flow',
+            style: primaryTextStyle(
+              context,
+              color: Theme.of(context).colorScheme.onPrimary,
             ),
-            onPressed: _initDeviceFlow,
-            child: Text(
-              'Initialize Device Flow',
-              style: primaryTextStyle(
-                context,
-                color: Colors.white,
-              ),
-              textAlign: TextAlign.center,
-            ),
+            textAlign: TextAlign.center,
           ),
         ),
         ..._buildDeviceAuth(),
@@ -555,7 +536,7 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
               value: _pkceMethod,
               underline: Container(
                 height: 2,
-                color: theme(context).colorPrimary,
+                color: Theme.of(context).colorScheme.primary,
               ),
               onChanged: (String? newValue) {
                 setState(() {
@@ -571,12 +552,14 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
                   child: Text(
                     value,
                     style: TextStyle(
-                      color: theme(context).colorTextPrimary,
+                      color: Theme.of(context)
+                          .extension<CustomColors>()!
+                          .textPrimary,
                     ),
                   ),
                 );
               }).toList(),
-            )
+            ),
           ],
         ),
       ),
@@ -655,7 +638,7 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
           children: [
             const Text('Use Access Token instead of ID Token'),
             Switch(
-              activeColor: theme(context).colorPrimary,
+              activeColor: Theme.of(context).colorScheme.primary,
               onChanged: (val) => {
                 setState(() {
                   _useAccessToken = !_useAccessToken;
@@ -672,8 +655,8 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
         ),
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: theme(context).colorPrimary,
-            foregroundColor: Colors.white,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
             minimumSize: const Size.fromHeight(40),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(
@@ -686,7 +669,7 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
             'Sign In',
             style: primaryTextStyle(
               context,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onPrimary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -757,104 +740,98 @@ class _SettingsOIDCProviderState extends State<SettingsOIDCProvider> {
       closePressed: () {
         Navigator.pop(context);
       },
-      actionText: widget.provider == null ? 'Save and add cluster(s)' : 'Save',
+      actionText: widget.provider == null ? 'Save and Add Cluster(s)' : 'Save',
       actionPressed: () {
-        _saveProvider(context);
+        _saveProvider();
       },
       actionIsLoading: _isLoading,
       child: Form(
         key: _providerConfigFormKey,
-        child: ListView(
-          shrinkWrap: false,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _nameController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Name',
-                ),
-                validator: _validator,
-              ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: Constants.spacingMiddle,
+              bottom: Constants.spacingMiddle,
+              left: Constants.spacingMiddle,
+              right: Constants.spacingMiddle,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Text('Authentication Flow'),
-                  DropdownButton(
-                    value: _flow,
-                    underline: Container(
-                      height: 2,
-                      color: theme(context).colorPrimary,
-                    ),
-                    onChanged: (OIDCFlow? newValue) {
-                      setState(() {
-                        _flow = newValue ?? OIDCFlow.standard;
-                      });
-                    },
-                    items: OIDCFlow.values.map((value) {
-                      return DropdownMenuItem(
-                        value: value,
-                        child: Text(
-                          value.pretty(),
-                          style: TextStyle(
-                            color: theme(context).colorTextPrimary,
-                          ),
-                        ),
-                      );
-                    }).toList(),
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Name',
                   ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _discoveryURLController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Discovery URL',
+                  validator: _validator,
                 ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _clientIDController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Client ID',
+                const SizedBox(height: Constants.spacingMiddle),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('Authentication Flow'),
+                    DropdownButton(
+                      value: _flow,
+                      underline: Container(
+                        height: 2,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      onChanged: (OIDCFlow? newValue) {
+                        setState(() {
+                          _flow = newValue ?? OIDCFlow.standard;
+                        });
+                      },
+                      items: OIDCFlow.values.map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value.pretty(),
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .extension<CustomColors>()!
+                                  .textPrimary,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ),
-                validator: _validator,
-              ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _discoveryURLController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Discovery URL',
+                  ),
+                  validator: _validator,
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _clientIDController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Client ID',
+                  ),
+                  validator: _validator,
+                ),
+                ..._buildFormForFlow(),
+              ],
             ),
-            ..._buildFormForFlow(),
-          ],
+          ),
         ),
       ),
     );

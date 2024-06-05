@@ -14,6 +14,22 @@ enum TerminalType {
   exec,
 }
 
+extension TerminalTypeExtension on TerminalType {
+  /// [toLocalizedString] returns a localized string for a source type.
+  String toLocalizedString() {
+    switch (this) {
+      case TerminalType.log:
+        return 'Logs';
+      case TerminalType.logstream:
+        return 'Logs Stream';
+      case TerminalType.exec:
+        return 'Terminal';
+      default:
+        return 'Invalid';
+    }
+  }
+}
+
 /// A [Terminal] represents a single terminal. A terminal can be used to show the logs of a container or to exec into a
 /// container.
 class Terminal {
@@ -88,13 +104,7 @@ class TerminalBackend {
           ? xtermcore.TerminalTargetPlatform.android
           : Platform.isIOS
               ? xtermcore.TerminalTargetPlatform.ios
-              : Platform.isMacOS
-                  ? xtermcore.TerminalTargetPlatform.macos
-                  : Platform.isLinux
-                      ? xtermcore.TerminalTargetPlatform.linux
-                      : Platform.isWindows
-                          ? xtermcore.TerminalTargetPlatform.windows
-                          : xtermcore.TerminalTargetPlatform.unknown,
+              : xtermcore.TerminalTargetPlatform.unknown,
     );
 
     channel.stream.listen(
@@ -111,23 +121,27 @@ class TerminalBackend {
     );
 
     terminal.onResize = (width, height, pixelWidth, pixelHeight) {
-      channel.sink.add(TerminalData(
-        op: 'resize',
-        data: '',
-        rows: height,
-        cols: width,
-      ).toString());
+      channel.sink.add(
+        TerminalData(
+          op: 'resize',
+          data: '',
+          rows: height,
+          cols: width,
+        ).toString(),
+      );
 
       // channel.sink.add('{"Cols": $width, "Op": "resize", "Rows": $height}');
     };
 
     terminal.onOutput = (data) {
-      channel.sink.add(TerminalData(
-        op: 'stdin',
-        data: data,
-        rows: 0,
-        cols: 0,
-      ).toString());
+      channel.sink.add(
+        TerminalData(
+          op: 'stdin',
+          data: data,
+          rows: 0,
+          cols: 0,
+        ).toString(),
+      );
 
       // if (data == '\r') {
       //   channel.sink.add('{"Data": "\\r", "Op": "stdin"}');
@@ -164,13 +178,7 @@ class LogStreamBackend {
           ? xtermcore.TerminalTargetPlatform.android
           : Platform.isIOS
               ? xtermcore.TerminalTargetPlatform.ios
-              : Platform.isMacOS
-                  ? xtermcore.TerminalTargetPlatform.macos
-                  : Platform.isLinux
-                      ? xtermcore.TerminalTargetPlatform.linux
-                      : Platform.isWindows
-                          ? xtermcore.TerminalTargetPlatform.windows
-                          : xtermcore.TerminalTargetPlatform.unknown,
+              : xtermcore.TerminalTargetPlatform.unknown,
     );
 
     channel.stream.listen(
@@ -198,8 +206,9 @@ class TerminalRepository with ChangeNotifier {
 
   List<Terminal> get terminals => _terminals;
 
-  /// [addTerminal] adds a new terminal to the repository.
-  void addTerminal(
+  /// [addTerminal] adds a new terminal to the repository and returns the index
+  /// of the added terminal.
+  int addTerminal(
     TerminalType type,
     String name,
     List<dynamic>? logs,
@@ -216,6 +225,7 @@ class TerminalRepository with ChangeNotifier {
       ),
     );
     notifyListeners();
+    return _terminals.length - 1;
   }
 
   /// [deleteTerminal] deletes the terminal with the provided [index]. If the

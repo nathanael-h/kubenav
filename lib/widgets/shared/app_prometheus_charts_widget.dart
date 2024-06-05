@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
@@ -6,7 +7,6 @@ import 'package:yaml/yaml.dart';
 import 'package:kubenav/models/plugins/prometheus.dart';
 import 'package:kubenav/models/plugins/time.dart';
 import 'package:kubenav/repositories/app_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/logger.dart';
@@ -14,6 +14,22 @@ import 'package:kubenav/utils/showmodal.dart';
 import 'package:kubenav/widgets/shared/app_list_item.dart';
 import 'package:kubenav/widgets/shared/app_prometheus_chart_widget.dart';
 import 'package:kubenav/widgets/shared/app_time_range_selector_widget.dart';
+
+List<Chart> _getChartsFromAnnotation(String annotation) {
+  final List<Chart> additionalCharts = [];
+
+  final parsedCharts = loadYaml(annotation);
+
+  for (var parsedChart in parsedCharts as List<dynamic>) {
+    additionalCharts.add(
+      Chart.fromYaml(
+        parsedChart,
+      ),
+    );
+  }
+
+  return additionalCharts;
+}
 
 /// The [AppPrometheusChartsWidget] checks if the given [manifest] contains
 /// a `kubenav.io/prometheus` annotation and merges the charts from the
@@ -23,11 +39,13 @@ import 'package:kubenav/widgets/shared/app_time_range_selector_widget.dart';
 class AppPrometheusChartsWidget extends StatefulWidget {
   const AppPrometheusChartsWidget({
     super.key,
-    required this.manifest,
+    required this.item,
+    required this.toJson,
     required this.defaultCharts,
   });
 
-  final Map<String, dynamic> manifest;
+  final dynamic item;
+  final Map<String, dynamic> Function(dynamic item)? toJson;
   final List<Chart> defaultCharts;
 
   @override
@@ -41,6 +59,7 @@ class _AppPrometheusChartsWidgetState extends State<AppPrometheusChartsWidget> {
     start: (DateTime.now().millisecondsSinceEpoch ~/ 1000) - 900,
     end: DateTime.now().millisecondsSinceEpoch ~/ 1000,
   );
+  dynamic _manifest;
   List<Chart> _charts = <Chart>[];
 
   /// [_getCharts] is used to check if the given [widget.manifest] contains a
@@ -48,7 +67,7 @@ class _AppPrometheusChartsWidgetState extends State<AppPrometheusChartsWidget> {
   /// case the user defined charts are added to the list of default charts. If
   /// we could not parse the value of the annotation we just use the default
   /// charts and log an error.
-  void _getCharts() {
+  Future<void> _getCharts() async {
     AppRepository appRepository = Provider.of<AppRepository>(
       context,
       listen: false,
@@ -56,44 +75,51 @@ class _AppPrometheusChartsWidgetState extends State<AppPrometheusChartsWidget> {
 
     if (appRepository.settings.prometheus.enabled == true) {
       try {
-        final List<Chart> additionalCharts = [];
+        if (widget.item != null && widget.toJson != null) {
+          final manifest = await compute(widget.toJson!, widget.item);
 
-        if (widget.manifest.containsKey('metadata') &&
-            widget.manifest['metadata'].containsKey('annotations') &&
-            widget.manifest['metadata']['annotations']
-                .containsKey('kubenav.io/prometheus') &&
-            widget.manifest['metadata']['annotations']
-                    ['kubenav.io/prometheus'] !=
-                'dashboard') {
-          Logger.log(
-            'AppPrometheusChartsController _getCharts',
-            'Manifest contains kubenav.io/prometheus annotation',
-            widget.manifest['metadata']['annotations']['kubenav.io/prometheus'],
-          );
-
-          final parsedCharts = loadYaml(
-            widget.manifest['metadata']['annotations']['kubenav.io/prometheus'],
-          );
-
-          for (var parsedChart in parsedCharts as List<dynamic>) {
-            additionalCharts.add(
-              Chart.fromYaml(
-                parsedChart,
-              ),
+          if (manifest.containsKey('metadata') &&
+              manifest['metadata'].containsKey('annotations') &&
+              manifest['metadata']['annotations']
+                  .containsKey('kubenav.io/prometheus') &&
+              manifest['metadata']['annotations']['kubenav.io/prometheus'] !=
+                  'dashboard') {
+            Logger.log(
+              'AppPrometheusChartsWidget _getCharts',
+              'Metadata Contains "kubenav.io/prometheus" Annotation',
+              manifest['metadata']['annotations']['kubenav.io/prometheus'],
             );
-          }
-        }
 
-        setState(() {
-          _charts = [...widget.defaultCharts, ...additionalCharts];
-        });
+            final additionalCharts = await compute(
+              _getChartsFromAnnotation,
+              manifest['metadata']['annotations']['kubenav.io/prometheus']
+                  as String,
+            );
+
+            setState(() {
+              _manifest = manifest;
+              _charts = [...widget.defaultCharts, ...additionalCharts];
+            });
+          } else {
+            setState(() {
+              _manifest = manifest;
+              _charts = widget.defaultCharts;
+            });
+          }
+        } else {
+          setState(() {
+            _manifest = null;
+            _charts = widget.defaultCharts;
+          });
+        }
       } catch (err) {
         Logger.log(
-          'AppPrometheusChartsController _getCharts',
-          'Could not parse kubenav.io/prometheus annotation',
+          'AppPrometheusChartsWidget _getCharts',
+          'Failed to Parse "kubenav.io/prometheus" Annotation',
           err,
         );
         setState(() {
+          _manifest = null;
           _charts = widget.defaultCharts;
         });
       }
@@ -113,11 +139,11 @@ class _AppPrometheusChartsWidgetState extends State<AppPrometheusChartsWidget> {
       listen: true,
     );
 
-    if (appRepository.settings.prometheus.enabled == false) {
+    if (appRepository.settings.prometheus.enabled == false || _charts.isEmpty) {
       return Container();
     }
 
-    return Wrap(
+    return Column(
       children: [
         Padding(
           padding: const EdgeInsets.only(
@@ -149,11 +175,11 @@ class _AppPrometheusChartsWidgetState extends State<AppPrometheusChartsWidget> {
                     ),
                   );
                 },
-                child: Wrap(
+                child: Row(
                   children: [
                     Icon(
                       Icons.schedule,
-                      color: theme(context).colorPrimary,
+                      color: Theme.of(context).colorScheme.primary,
                       size: 16,
                     ),
                     const SizedBox(width: Constants.spacingExtraSmall),
@@ -161,7 +187,7 @@ class _AppPrometheusChartsWidgetState extends State<AppPrometheusChartsWidget> {
                       'Time Range',
                       style: secondaryTextStyle(
                         context,
-                        color: theme(context).colorPrimary,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ],
@@ -188,7 +214,7 @@ class _AppPrometheusChartsWidgetState extends State<AppPrometheusChartsWidget> {
                 AppPrometheusChartWidget(
                   title: _charts[index].title,
                   unit: _charts[index].unit,
-                  manifest: widget.manifest,
+                  manifest: _manifest,
                   queries: _charts[index].queries,
                   time: _time,
                 ),
@@ -216,6 +242,7 @@ class _AppPrometheusChartsWidgetState extends State<AppPrometheusChartsWidget> {
             ),
           ),
         ),
+        const SizedBox(height: Constants.spacingMiddle),
       ],
     );
   }

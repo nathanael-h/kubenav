@@ -1,209 +1,85 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'package:code_text_field/code_text_field.dart';
+import 'package:highlight/languages/json.dart' as highlight_json;
+import 'package:highlight/languages/yaml.dart' as highlight_yaml;
 import 'package:provider/provider.dart';
+import 'package:yaml/yaml.dart';
 
-import 'package:kubenav/models/resource.dart';
 import 'package:kubenav/repositories/app_repository.dart';
 import 'package:kubenav/repositories/bookmarks_repository.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
+import 'package:kubenav/services/helpers_service.dart';
 import 'package:kubenav/services/kubernetes_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/custom_icons.dart';
+import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/logger.dart';
+import 'package:kubenav/utils/navigate.dart';
 import 'package:kubenav/utils/showmodal.dart';
-import 'package:kubenav/widgets/resources/list/default_list_item.dart';
-import 'package:kubenav/widgets/resources/list/list_create_resource.dart';
+import 'package:kubenav/utils/themes.dart';
+import 'package:kubenav/widgets/resources/resources/resources.dart';
+import 'package:kubenav/widgets/resources/resources/resources_nodes.dart';
+import 'package:kubenav/widgets/resources/resources/resources_pods.dart';
+import 'package:kubenav/widgets/resources/resources_details.dart';
 import 'package:kubenav/widgets/shared/app_bottom_navigation_bar_widget.dart';
-import 'package:kubenav/widgets/shared/app_drawer.dart';
+import 'package:kubenav/widgets/shared/app_bottom_sheet_widget.dart';
 import 'package:kubenav/widgets/shared/app_error_widget.dart';
 import 'package:kubenav/widgets/shared/app_floating_action_buttons_widget.dart';
+import 'package:kubenav/widgets/shared/app_list_item.dart';
 import 'package:kubenav/widgets/shared/app_namespaces_widget.dart';
 import 'package:kubenav/widgets/shared/app_resource_actions.dart';
 
-/// [resourceListActions] returns the resource actions for the list view of a
-/// resource.
-List<AppResourceActionsModel> resourceListActions(
-  BuildContext context,
-  String title,
-  String resource,
-  String path,
-  ResourceScope scope,
-  List<AdditionalPrinterColumns> additionalPrinterColumns,
-  void Function() onRefresh,
-) {
-  ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
-    context,
-    listen: false,
-  );
-  BookmarksRepository bookmarksRepository = Provider.of<BookmarksRepository>(
-    context,
-    listen: false,
-  );
+/// The [ResourcesListData] model is used for the data returned by the
+/// `_fetchItems` function in the [ResourcesList] widget. The model contains the
+/// [list] of items and the [metrics] of the resource.
+///
+/// This model is used to decode the list of items and metrics within one
+/// isolate. Without it we would have to use two isolates, one for the list
+/// items and one for the metrics.
+class ResourcesListData {
+  String list;
+  String? metrics;
 
-  return [
-    AppResourceActionsModel(
-      title: 'Create',
-      icon: Icons.create,
-      onTap: () {
-        if (Resources.map.containsKey(resource) &&
-            Resources.map[resource]!.resource == resource &&
-            Resources.map[resource]!.path == path &&
-            Resources.map[resource]!.template != '') {
-          showModal(
-            context,
-            ListCreateResource(
-              title: title,
-              resource: resource,
-              path: path,
-              template: Resources.map[resource]!.template,
-            ),
-          );
-        } else {
-          showModal(
-            context,
-            ListCreateResource(
-              title: title,
-              resource: resource,
-              path: path,
-              template:
-                  '{"apiVersion":"","kind":"","metadata":{"name":"","namespace":""},"spec":{}}',
-            ),
-          );
-        }
-      },
-    ),
-    AppResourceActionsModel(
-      title: 'Refresh',
-      icon: Icons.refresh,
-      onTap: onRefresh,
-    ),
-    AppResourceActionsModel(
-      title: bookmarksRepository.isBookmarked(
-                BookmarkType.list,
-                clustersRepository.activeClusterId,
-                title,
-                resource,
-                path,
-                scope,
-                null,
-                clustersRepository
-                    .getCluster(
-                      clustersRepository.activeClusterId,
-                    )
-                    ?.namespace,
-              ) >
-              -1
-          ? 'Remove Bookmark'
-          : 'Add Bookmark',
-      icon: bookmarksRepository.isBookmarked(
-                BookmarkType.list,
-                clustersRepository.activeClusterId,
-                title,
-                resource,
-                path,
-                scope,
-                null,
-                clustersRepository
-                    .getCluster(
-                      clustersRepository.activeClusterId,
-                    )
-                    ?.namespace,
-              ) >
-              -1
-          ? Icons.bookmark
-          : Icons.bookmark_border,
-      onTap: () {
-        final bookmarkIndex = bookmarksRepository.isBookmarked(
-          BookmarkType.list,
-          clustersRepository.activeClusterId,
-          title,
-          resource,
-          path,
-          scope,
-          null,
-          clustersRepository
-              .getCluster(
-                clustersRepository.activeClusterId,
-              )
-              ?.namespace,
-        );
-        if (bookmarkIndex > -1) {
-          bookmarksRepository.removeBookmark(bookmarkIndex);
-        } else {
-          bookmarksRepository.addBookmark(
-            BookmarkType.list,
-            clustersRepository.activeClusterId,
-            title,
-            resource,
-            path,
-            scope,
-            additionalPrinterColumns,
-            null,
-            clustersRepository
-                .getCluster(
-                  clustersRepository.activeClusterId,
-                )
-                ?.namespace,
-          );
-        }
-      },
-    ),
-  ];
-}
-
-/// The [ResourcesListResult] model is the returns value for the [_fetchItems]
-/// future. It contains the loaded items and metrics for Pods and Nodes.
-class ResourcesListResult {
-  List<dynamic> items = <dynamic>[];
-  dynamic metrics;
-
-  ResourcesListResult({
-    required this.items,
+  ResourcesListData({
+    required this.list,
     required this.metrics,
   });
 }
 
-/// The [ResourcesList] renders a list of resources. The resources which should
-/// beloaded are defined via the following arguments:
-/// - [title], [resource], [path] and [scope] allows us to uniquly identify the
-///   Kubernetes resource which should be loaded.
-/// - [namespace] and [selector] can be used to overwrite the currently selected
-///   namespace of the active cluster and to spefiy the a label selector or
-///   field selector to filter the resources (e.g. display all pods for a
-///   deployment).
+/// The [ResourcesList] widget is used to display a list of [items] for a
+/// provided [resource]. The [itemBuilder] function is used to generate the list
+/// items for the provided [resource].
 class ResourcesList extends StatefulWidget {
   const ResourcesList({
     super.key,
-    required this.title,
     required this.resource,
-    required this.path,
-    required this.scope,
-    required this.additionalPrinterColumns,
     required this.namespace,
     required this.selector,
+    this.status = ResourceStatus.undefined,
   });
 
-  final String title;
-  final String resource;
-  final String path;
-  final ResourceScope scope;
-  final List<AdditionalPrinterColumns> additionalPrinterColumns;
+  final Resource resource;
   final String? namespace;
   final String? selector;
+  final ResourceStatus status;
 
   @override
   State<ResourcesList> createState() => _ResourcesListState();
 }
 
 class _ResourcesListState extends State<ResourcesList> {
-  late Future<ResourcesListResult> _futureFetchItems;
-  String _filter = '';
+  late Future<List<ResourceItem>> _futureFetchItems;
+  final _filterController = TextEditingController();
+  ResourceStatus _status = ResourceStatus.undefined;
 
-  /// [_fetchItems] loads the items for the requested resource and the metrics
-  /// when the requested resource is a Pod or Node. When we are able to load the
-  /// items and metrics we return a [ResourcesListResult].
-  Future<ResourcesListResult> _fetchItems() async {
+  /// [_fetchItems] is used to fetch the items for the provided [resource]. The
+  /// function returns a list of [ResourceItem]s. If the resource is a `pod` or
+  /// a `node` we also fetch the metrics for the resource.
+  Future<List<ResourceItem>> _fetchItems() async {
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: false,
@@ -217,134 +93,132 @@ class _ResourcesListState extends State<ResourcesList> {
       clustersRepository.activeClusterId,
     );
 
-    final resourcesListUrl = widget.scope == ResourceScope.cluster
-        ? '${widget.path}/${widget.resource}?${widget.selector} ?? ' '}'
+    final listUrl = widget.resource.scope == ResourceScope.cluster
+        ? '${widget.resource.path}/${widget.resource.resource}?${widget.selector} ?? '
+            '}'
         : widget.namespace != null
-            ? '${widget.path}/namespaces/${widget.namespace}/${widget.resource}?${widget.selector ?? ''}'
+            ? '${widget.resource.path}/namespaces/${widget.namespace}/${widget.resource.resource}?${widget.selector ?? ''}'
             : widget.selector != null &&
                     widget.selector!.startsWith('fieldSelector=spec.nodeName=')
-                ? '${widget.path}/${widget.resource}?${widget.selector ?? ''}'
-                : '${widget.path}${cluster!.namespace != '' ? '/namespaces/${cluster.namespace}' : ''}/${widget.resource}?${widget.selector ?? ''}';
+                ? '${widget.resource.path}/${widget.resource.resource}?${widget.selector ?? ''}'
+                : '${widget.resource.path}${cluster!.namespace != '' ? '/namespaces/${cluster.namespace}' : ''}/${widget.resource.resource}?${widget.selector ?? ''}';
 
-    final resourcesList = await KubernetesService(
+    final listResult = await KubernetesService(
       cluster: cluster!,
       proxy: appRepository.settings.proxy,
       timeout: appRepository.settings.timeout,
-    ).getRequest(resourcesListUrl);
-
-    Logger.log(
-      'ResourcesListRepository _init',
-      '${resourcesList['items'].length} items were returned',
-      'Request URL: $resourcesListUrl\nManifest: $resourcesList',
-    );
+    ).getRequest(listUrl);
 
     try {
-      if ((widget.resource == Resources.map['pods']!.resource &&
-              widget.path == Resources.map['pods']!.path) ||
-          (widget.resource == Resources.map['nodes']!.resource &&
-              widget.path == Resources.map['nodes']!.path)) {
-        final metricsUrl = widget.scope == ResourceScope.cluster
-            ? '/apis/metrics.k8s.io/v1beta1/${widget.resource}?${widget.selector ?? ''}'
+      if ((widget.resource.resource == resourceNode.resource &&
+              widget.resource.path == resourceNode.path) ||
+          (widget.resource.resource == resourcePod.resource &&
+              widget.resource.path == resourcePod.path)) {
+        final metricsUrl = widget.resource.scope == ResourceScope.cluster
+            ? '/apis/metrics.k8s.io/v1beta1/${widget.resource.resource}?${widget.selector ?? ''}'
             : widget.namespace != null
-                ? '/apis/metrics.k8s.io/v1beta1/namespaces/${widget.namespace}/${widget.resource}?${widget.selector ?? ''}'
-                : '/apis/metrics.k8s.io/v1beta1${cluster.namespace != '' ? '/namespaces/${cluster.namespace}' : ''}/${widget.resource}?${widget.selector ?? ''}';
+                ? '/apis/metrics.k8s.io/v1beta1/namespaces/${widget.namespace}/${widget.resource.resource}?${widget.selector ?? ''}'
+                : '/apis/metrics.k8s.io/v1beta1${cluster.namespace != '' ? '/namespaces/${cluster.namespace}' : ''}/${widget.resource.resource}?${widget.selector ?? ''}';
 
-        final metrics = await KubernetesService(
+        final metricsResult = await KubernetesService(
           cluster: cluster,
           proxy: appRepository.settings.proxy,
           timeout: appRepository.settings.timeout,
         ).getRequest(metricsUrl);
 
-        return ResourcesListResult(
-          items: resourcesList['items'],
-          metrics: metrics,
+        return await compute(
+          widget.resource.decodeListData,
+          ResourcesListData(
+            list: listResult,
+            metrics: metricsResult,
+          ),
         );
       }
     } catch (err) {
       Logger.log(
-        'ResourcesListRepository _init',
-        'Metrics were not loaded',
+        'ResourcesList _fetchItems',
+        'Failed to Load Metrics',
         err,
       );
     }
 
-    return ResourcesListResult(
-      items: resourcesList['items'],
-      metrics: null,
+    return await compute(
+      widget.resource.decodeListData,
+      ResourcesListData(
+        list: listResult,
+        metrics: null,
+      ),
     );
   }
 
-  /// [_getFilteredItems] filters the given list of [items] by the setted
-  /// [_filter]. When the [_filter] is not empty the name of an item must
-  /// contain the filter keyword.
-  List<dynamic> _getFilteredItems(List<dynamic> items) {
-    return _filter == ''
-        ? items
-        : items
-            .where((item) =>
-                item['metadata'] != null &&
-                item['metadata']['name'] != null &&
-                item['metadata']['name'] is String &&
-                item['metadata']['name'].contains(_filter.toLowerCase()))
-            .toList();
-  }
-
-  /// [_buildListItem] is used to build the widget for a single resource item.
-  /// When we know the resource, because it is present in the [Resources.map] we
-  /// apply the `buildListItem` function for this resource. If we do not know
-  /// the resource (e.g. a CRD or a standard resource which is not defined in
-  /// the [Resources.map]) we use the [DefaultListItem] widget to display the
-  /// item in the resources list.
-  Widget _buildListItem(
-    String title,
-    String resource,
-    String path,
-    ResourceScope scope,
-    List<AdditionalPrinterColumns> additionalPrinterColumns,
-    dynamic item,
-    dynamic metrics,
-  ) {
-    if (Resources.map.containsKey(resource) &&
-        Resources.map[resource]!.resource == resource &&
-        Resources.map[resource]!.path == path &&
-        Resources.map[resource]!.buildListItem != null) {
-      return Resources.map[resource]!.buildListItem!(
-        title,
-        resource,
-        path,
-        scope,
-        additionalPrinterColumns,
-        item,
-        metrics,
-      );
+  /// [_getFilteredItems] is a helper function to filter the provided [items]
+  /// based on the [_filterController.text] and the [_status].
+  List<ResourceItem> _getFilteredItems(List<ResourceItem> items) {
+    if (_filterController.text.isEmpty && _status == ResourceStatus.undefined) {
+      return items;
     }
 
-    return DefaultListItem(
-      title: title,
-      resource: resource,
-      path: path,
-      scope: scope,
-      additionalPrinterColumns: additionalPrinterColumns,
-      item: item,
-    );
+    if (_filterController.text.isNotEmpty &&
+        _status == ResourceStatus.undefined) {
+      return items
+          .where(
+            (e) =>
+                widget.resource
+                    .getName(e.item)
+                    .contains(_filterController.text.toLowerCase()) ==
+                true,
+          )
+          .toList();
+    }
+
+    if (_filterController.text.isEmpty && _status != ResourceStatus.undefined) {
+      return items.where((e) => e.status == _status).toList();
+    }
+
+    return items
+        .where(
+          (e) =>
+              widget.resource
+                      .getName(e.item)
+                      .contains(_filterController.text.toLowerCase()) ==
+                  true &&
+              e.status == _status,
+        )
+        .toList();
   }
 
-  /// [_buildLayout] builds the page layout for the list page. This includes
-  /// the scaffold and appbar and is required, because the [AppBar] actions are
-  /// not updated otherwise, when a user opt in for the classic mode. This only
-  /// effects the bookmark action.
-  Widget _buildLayout(BuildContext context, Widget child) {
-    AppRepository appRepository = Provider.of<AppRepository>(
-      context,
-      listen: false,
-    );
+  @override
+  void initState() {
+    super.initState();
+
+    _filterController.addListener(() {
+      setState(() {});
+    });
+    _status = widget.status;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    setState(() {
+      _futureFetchItems = _fetchItems();
+    });
+  }
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
-      listen: false,
+      listen: true,
     );
 
     return Scaffold(
-      drawer: appRepository.settings.classicMode ? const AppDrawer() : null,
       appBar: AppBar(
         centerTitle: true,
 
@@ -353,7 +227,17 @@ class _ResourcesListState extends State<ResourcesList> {
         /// user can change the active namespace of the cluster. If the resource
         /// is cluster scoped or when the user specified a selector (e.g. to
         /// view all Pods of a Deployment) we do not show the button.
-        actions: _buildAppBarActions(context),
+        actions: widget.resource.scope == ResourceScope.namespaced &&
+                widget.selector == null
+            ? [
+                IconButton(
+                  icon: const Icon(CustomIcons.namespaces),
+                  onPressed: () {
+                    showModal(context, const AppNamespacesWidget());
+                  },
+                ),
+              ]
+            : null,
 
         /// We always display the title of the resource as main title for the
         /// widget.
@@ -361,15 +245,15 @@ class _ResourcesListState extends State<ResourcesList> {
         /// of the currently active cluster or for cluster scoped resources we
         /// display 'All Namespaces' as subtitle.
         /// If the user has specified a selector we display the namespace which
-        /// which was specified within the selector. If the user didn't
-        /// specified a namespace for the selector we also show 'All Namespaces'
-        /// as the subtitle.
+        /// was specified within the selector. If the user didn't specified a
+        /// namespace for the selector we also show 'All Namespaces' as the
+        /// subtitle.
         title: Column(
           children: [
             Text(
-              Characters(
-                widget.title,
-              ).replaceAll(Characters(''), Characters('\u{200B}')).toString(),
+              Characters(widget.resource.plural)
+                  .replaceAll(Characters(''), Characters('\u{200B}'))
+                  .toString(),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 20,
@@ -379,20 +263,22 @@ class _ResourcesListState extends State<ResourcesList> {
             ),
             widget.selector == null
                 ? Text(
-                    Characters(clustersRepository
-                                        .getCluster(
-                                          clustersRepository.activeClusterId,
-                                        )
-                                        ?.namespace ==
-                                    '' ||
-                                (widget.scope == ResourceScope.cluster)
-                            ? 'All Namespaces'
-                            : clustersRepository
-                                    .getCluster(
-                                      clustersRepository.activeClusterId,
-                                    )
-                                    ?.namespace ??
-                                'All Namespaces')
+                    Characters(
+                      clustersRepository
+                                      .getCluster(
+                                        clustersRepository.activeClusterId,
+                                      )
+                                      ?.namespace ==
+                                  '' ||
+                              (widget.resource.scope == ResourceScope.cluster)
+                          ? 'All Namespaces'
+                          : clustersRepository
+                                  .getCluster(
+                                    clustersRepository.activeClusterId,
+                                  )
+                                  ?.namespace ??
+                              'All Namespaces',
+                    )
                         .replaceAll(Characters(''), Characters('\u{200B}'))
                         .toString(),
                     textAlign: TextAlign.center,
@@ -418,92 +304,411 @@ class _ResourcesListState extends State<ResourcesList> {
           ],
         ),
       ),
-      bottomNavigationBar: appRepository.settings.classicMode
-          ? null
-          : const AppBottomNavigationBarWidget(),
+      bottomNavigationBar: const AppBottomNavigationBarWidget(),
       floatingActionButton: const AppFloatingActionButtonsWidget(),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
-            children: [child],
+            children: [
+              FutureBuilder(
+                future: _futureFetchItems,
+                builder: (
+                  BuildContext context,
+                  AsyncSnapshot<List<ResourceItem>> snapshot,
+                ) {
+                  switch (snapshot.connectionState) {
+                    case ConnectionState.none:
+                    case ConnectionState.waiting:
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(
+                              Constants.spacingMiddle,
+                            ),
+                            child: CircularProgressIndicator(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      );
+                    default:
+                      if (snapshot.hasError || snapshot.data == null) {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Flexible(
+                              child: Padding(
+                                padding: const EdgeInsets.all(
+                                  Constants.spacingMiddle,
+                                ),
+                                child: AppErrorWidget(
+                                  message:
+                                      'Failed to Load ${widget.resource.plural}',
+                                  details: snapshot.error.toString(),
+                                  icon:
+                                      'assets/resources/${widget.resource.icon}.svg',
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      final filteredItems = _getFilteredItems(snapshot.data!);
+
+                      return Wrap(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.only(
+                              top: Constants.spacingMiddle,
+                              bottom: Constants.spacingSmall,
+                              left: Constants.spacingMiddle,
+                              right: Constants.spacingMiddle,
+                            ),
+                            color: Theme.of(context).colorScheme.primary,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _filterController,
+                                    style: TextStyle(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimary,
+                                    ),
+                                    cursorColor:
+                                        Theme.of(context).colorScheme.onPrimary,
+                                    keyboardType: TextInputType.text,
+                                    autocorrect: false,
+                                    enableSuggestions: false,
+                                    maxLines: 1,
+                                    decoration: InputDecoration(
+                                      border: const OutlineInputBorder(),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderSide: BorderSide(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimary,
+                                          width: 0.0,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderSide: BorderSide(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimary,
+                                          width: 0.0,
+                                        ),
+                                      ),
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.all(8),
+                                      hintStyle: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onPrimary,
+                                      ),
+                                      hintText: 'Filter...',
+                                      suffixIcon: IconButton(
+                                        onPressed: () {
+                                          _filterController.clear();
+                                        },
+                                        icon: Icon(
+                                          Icons.clear,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                ResourcesListStatus(
+                                  items: snapshot.data!,
+                                  status: _status,
+                                  selectStatus: (ResourceStatus status) {
+                                    setState(() {
+                                      _status = status;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          ResourcesListActions(
+                            items: filteredItems,
+                            resource: widget.resource,
+                            refresh: () {
+                              setState(() {
+                                _futureFetchItems = _fetchItems();
+                              });
+                            },
+                          ),
+                          Container(
+                            padding: const EdgeInsets.only(
+                              top: Constants.spacingMiddle,
+                              bottom: Constants.spacingMiddle,
+                            ),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              padding: const EdgeInsets.only(
+                                right: Constants.spacingMiddle,
+                                left: Constants.spacingMiddle,
+                              ),
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(
+                                height: Constants.spacingMiddle,
+                              ),
+                              itemCount: filteredItems.length,
+                              itemBuilder: (context, index) {
+                                return widget.resource.listItemBuilder(
+                                  context,
+                                  widget.resource,
+                                  filteredItems[index],
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                  }
+                },
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  /// [_buildAppBarActions] returns the actions for the [AppBar]. The actions
-  /// are containing the actions menu for the resources, when the user opt in
-  /// for the classic mode and an action to open the modal to select an
-  /// namespace, when the current resource is a namespaces resource and no
-  /// selector was specified.
-  List<Widget> _buildAppBarActions(BuildContext context) {
-    AppRepository appRepository = Provider.of<AppRepository>(
+/// The [ResourcesListActions] widget is used to render the actions for the
+/// resources in the list view. The [ResourcesListActions] widget is used in the
+/// [ResourcesList] widget.
+class ResourcesListActions extends StatelessWidget {
+  const ResourcesListActions({
+    super.key,
+    required this.items,
+    required this.resource,
+    required this.refresh,
+  });
+
+  final List<ResourceItem> items;
+  final Resource resource;
+  final void Function() refresh;
+
+  @override
+  Widget build(BuildContext context) {
+    ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
-      listen: false,
+      listen: true,
+    );
+    BookmarksRepository bookmarksRepository = Provider.of<BookmarksRepository>(
+      context,
+      listen: true,
     );
 
-    final List<Widget> actions = [];
-
-    if (widget.scope == ResourceScope.namespaced && widget.selector == null) {
-      actions.add(
-        IconButton(
-          icon: const Icon(CustomIcons.namespaces),
-          onPressed: () {
-            showModal(context, const AppNamespacesWidget());
+    return AppResourceActions(
+      mode: AppResourceActionsMode.header,
+      actions: [
+        AppResourceActionsModel(
+          title: 'Create',
+          icon: Icons.create,
+          onTap: () {
+            showModal(
+              context,
+              ResourcesListItemCreateResource(
+                resource: resource,
+              ),
+            );
           },
         ),
-      );
-    }
+        AppResourceActionsModel(
+          title: 'Delete',
+          icon: Icons.delete,
+          onTap: () {
+            showModal(
+              context,
+              ResourcesListItemDeleteResources(
+                items: items,
+                resource: resource,
+              ),
+            );
+          },
+        ),
+        AppResourceActionsModel(
+          title: 'Refresh',
+          icon: Icons.refresh,
+          onTap: refresh,
+        ),
+        AppResourceActionsModel(
+          title: bookmarksRepository.isBookmarked(
+                    BookmarkType.list,
+                    clustersRepository.activeClusterId,
+                    null,
+                    clustersRepository
+                        .getCluster(
+                          clustersRepository.activeClusterId,
+                        )
+                        ?.namespace,
+                    resource,
+                  ) >
+                  -1
+              ? 'Remove Bookmark'
+              : 'Add Bookmark',
+          icon: bookmarksRepository.isBookmarked(
+                    BookmarkType.list,
+                    clustersRepository.activeClusterId,
+                    null,
+                    clustersRepository
+                        .getCluster(
+                          clustersRepository.activeClusterId,
+                        )
+                        ?.namespace,
+                    resource,
+                  ) >
+                  -1
+              ? Icons.bookmark
+              : Icons.bookmark_border,
+          onTap: () {
+            final bookmarkIndex = bookmarksRepository.isBookmarked(
+              BookmarkType.list,
+              clustersRepository.activeClusterId,
+              null,
+              clustersRepository
+                  .getCluster(
+                    clustersRepository.activeClusterId,
+                  )
+                  ?.namespace,
+              resource,
+            );
+            if (bookmarkIndex > -1) {
+              bookmarksRepository.removeBookmark(bookmarkIndex);
+            } else {
+              bookmarksRepository.addBookmark(
+                BookmarkType.list,
+                clustersRepository.activeClusterId,
+                null,
+                clustersRepository
+                    .getCluster(
+                      clustersRepository.activeClusterId,
+                    )
+                    ?.namespace,
+                resource,
+              );
+            }
+          },
+        ),
+      ],
+    );
+  }
+}
 
-    if (appRepository.settings.classicMode) {
-      actions.add(
-        AppResourceActions(
-          mode: AppResourceActionsMode.menu,
-          actions: resourceListActions(
-            context,
-            widget.title,
-            widget.resource,
-            widget.path,
-            widget.scope,
-            widget.additionalPrinterColumns,
-            () {
-              setState(() {
-                _futureFetchItems = _fetchItems();
-              });
-            },
+/// The [ResourcesListStatus] widget is used to display a popup menu button to
+/// filter the [items] of the [ResourcesList] by their [status]. The widget
+/// displays the count of items for each status.
+class ResourcesListStatus extends StatelessWidget {
+  const ResourcesListStatus({
+    super.key,
+    required this.items,
+    required this.status,
+    required this.selectStatus,
+  });
+
+  final List<ResourceItem> items;
+  final ResourceStatus status;
+  final Function(ResourceStatus) selectStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final undefinedCount = items.length;
+    final successCount =
+        items.where((e) => e.status == ResourceStatus.success).length;
+    final warningCount =
+        items.where((e) => e.status == ResourceStatus.warning).length;
+    final dangerCount =
+        items.where((e) => e.status == ResourceStatus.danger).length;
+
+    return PopupMenuButton<ResourceStatus>(
+      initialValue: status,
+      onSelected: selectStatus,
+      icon: Icon(
+        Icons.filter_list,
+        color: Theme.of(context).colorScheme.onPrimary,
+      ),
+      itemBuilder: (BuildContext context) => <PopupMenuEntry<ResourceStatus>>[
+        PopupMenuItem<ResourceStatus>(
+          value: ResourceStatus.undefined,
+          child: Text(
+            '${ResourceStatus.undefined.toLocalizedString()} ($undefinedCount)',
           ),
         ),
-      );
-    }
-
-    return actions;
-  }
-
-  /// [_buildHeaderActions] returns the resource actions as header when the user
-  /// didn't opt in for the classic mode.
-  Widget _buildHeaderActions(BuildContext context) {
-    AppRepository appRepository = Provider.of<AppRepository>(
-      context,
-      listen: false,
-    );
-
-    if (!appRepository.settings.classicMode) {
-      return AppResourceActions(
-        mode: AppResourceActionsMode.header,
-        actions: resourceListActions(
-          context,
-          widget.title,
-          widget.resource,
-          widget.path,
-          widget.scope,
-          widget.additionalPrinterColumns,
-          () {
-            setState(() {
-              _futureFetchItems = _fetchItems();
-            });
-          },
+        PopupMenuItem<ResourceStatus>(
+          value: ResourceStatus.success,
+          child: Text(
+            '${ResourceStatus.success.toLocalizedString()} ($successCount)',
+          ),
         ),
+        PopupMenuItem<ResourceStatus>(
+          value: ResourceStatus.warning,
+          child: Text(
+            '${ResourceStatus.warning.toLocalizedString()} ($warningCount)',
+          ),
+        ),
+        PopupMenuItem<ResourceStatus>(
+          value: ResourceStatus.danger,
+          child: Text(
+            '${ResourceStatus.danger.toLocalizedString()} ($dangerCount)',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The [ResourcesListItem] widget is used to display a single [item] in the
+/// [ResourcesList]. The widget displays the [name], [namespace] and [details]
+/// of the [item].
+class ResourcesListItem extends StatelessWidget {
+  const ResourcesListItem({
+    super.key,
+    required this.name,
+    required this.namespace,
+    required this.resource,
+    required this.item,
+    required this.status,
+    required this.details,
+  });
+
+  final String name;
+  final String? namespace;
+  final Resource resource;
+  final dynamic item;
+  final ResourceStatus status;
+  final List<String> details;
+
+  /// [_buildStatus] is a helper function to display the status of the resource.
+  /// The status can be `success`, `danger` or `warning`. The function returns
+  /// an icon with the color of the status. If the status is `undefined` the
+  /// function returns an empty container.
+  Widget _buildStatus(BuildContext context, ResourceStatus status) {
+    if (status != ResourceStatus.undefined) {
+      return Wrap(
+        children: [
+          const SizedBox(width: Constants.spacingSmall),
+          Icon(
+            Icons.radio_button_checked,
+            size: 24,
+            color: status == ResourceStatus.success
+                ? Theme.of(context).extension<CustomColors>()!.success
+                : status == ResourceStatus.danger
+                    ? Theme.of(context).extension<CustomColors>()!.error
+                    : Theme.of(context).extension<CustomColors>()!.warning,
+          ),
+        ],
       );
     }
 
@@ -511,165 +716,629 @@ class _ResourcesListState extends State<ResourcesList> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    setState(() {
-      _futureFetchItems = _fetchItems();
-    });
+  Widget build(BuildContext context) {
+    return AppListItem(
+      onTap: () {
+        navigate(
+          context,
+          ResourcesDetails(
+            name: name,
+            namespace: namespace,
+            resource: resource,
+          ),
+        );
+      },
+      onLongPress: () {
+        hapticFeedback();
+
+        showActions(
+          context,
+          ResourcesListItemActions(
+            name: name,
+            namespace: namespace,
+            resource: resource,
+            item: item,
+          ),
+        );
+      },
+      slidableActions: [
+        AppListItemSlidableAction(
+          icon: Icons.more_horiz,
+          label: 'More',
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          onTap: (BuildContext context) {
+            showActions(
+              context,
+              ResourcesListItemActions(
+                name: name,
+                namespace: namespace,
+                resource: resource,
+                item: item,
+              ),
+            );
+          },
+        ),
+      ],
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  Characters(name)
+                      .replaceAll(Characters(''), Characters('\u{200B}'))
+                      .toString(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: primaryTextStyle(
+                    context,
+                  ),
+                ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: List.generate(
+                    details.length,
+                    (index) {
+                      return Text(
+                        Characters(
+                          details[index],
+                        )
+                            .replaceAll(
+                              Characters(''),
+                              Characters('\u{200B}'),
+                            )
+                            .toString(),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: secondaryTextStyle(
+                          context,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _buildStatus(context, status),
+        ],
+      ),
+    );
+  }
+}
+
+/// The [ResourcesListItemActions] widget is used to display the actions for a
+/// [ResourcesListItem]. It reuses the [resourceDetailsActions] function to
+/// generate the actions for the provided [item].
+class ResourcesListItemActions extends StatelessWidget {
+  const ResourcesListItemActions({
+    super.key,
+    required this.name,
+    required this.namespace,
+    required this.resource,
+    required this.item,
+  });
+
+  final String name;
+  final String? namespace;
+  final Resource resource;
+  final dynamic item;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppResourceActions(
+      mode: AppResourceActionsMode.actions,
+      actions: resourceDetailsActions(
+        context,
+        name,
+        namespace,
+        resource,
+        item,
+        null,
+      ),
+    );
+  }
+}
+
+/// [_createResourceJson] is a helper function to prettify the provided
+/// [template] in the [ResourcesListItemCreateResource] widget, when the user
+/// has enabled the `json` option in the settings.
+String _createResourceJson(String template) {
+  final parsedTemplate = json.decode(template);
+  JsonEncoder encoder = const JsonEncoder.withIndent('  ');
+  return encoder.convert(parsedTemplate);
+}
+
+/// [_createResourceDecodeJson] is a helper function to decode the provided
+/// [template] in the [ResourcesListItemCreateResource] widget, when the user
+/// has enabled the `json` option in the settings.
+///
+/// This is required to run the `json.decode` function in an isolate.
+dynamic _createResourceDecodeJson(String template) {
+  return json.decode(template);
+}
+
+/// [_createResourceDecodeJson] is a helper function to decode the provided
+/// [template] in the [ResourcesListItemCreateResource] widget, when the user
+/// has enabled the `yaml` option in the settings.
+///
+/// This is required to run the `json.decode` function in an isolate.
+dynamic _createResourceDecodeYaml(String template) {
+  return loadYaml(template);
+}
+
+/// The [ResourcesListItemCreateResource] widget can be used to create a new
+/// [resource]. The widget renders the provided [resource.template] in a code
+/// editor, where the user can modify the template. The user can then create the
+/// resource by pressing the action button.
+class ResourcesListItemCreateResource extends StatefulWidget {
+  const ResourcesListItemCreateResource({
+    super.key,
+    required this.resource,
+  });
+
+  final Resource resource;
+
+  @override
+  State<ResourcesListItemCreateResource> createState() =>
+      _ResourcesListItemCreateResourceState();
+}
+
+class _ResourcesListItemCreateResourceState
+    extends State<ResourcesListItemCreateResource> {
+  CodeController _codeController = CodeController();
+  bool _isLoading = false;
+
+  /// [_init] is called when the widget is initialized. Within the [_init]
+  /// function we prettify the provided [widget.resource.template] and convert
+  /// it to either a json document or a yaml document depending on the users
+  /// settings.
+  Future<void> _init() async {
+    AppRepository appRepository = Provider.of<AppRepository>(
+      context,
+      listen: false,
+    );
+
+    _codeController = CodeController(
+      text: '',
+      language: appRepository.settings.editorFormat == 'json'
+          ? highlight_json.json
+          : highlight_yaml.yaml,
+    );
+
+    try {
+      if (appRepository.settings.editorFormat == 'json') {
+        _codeController.text = await compute(
+          _createResourceJson,
+          widget.resource.template,
+        );
+      } else {
+        final data = await HelpersService().prettifyYAML(
+          widget.resource.template,
+        );
+        _codeController.text = data;
+      }
+    } catch (err) {
+      Logger.log(
+        'ResourcesListItemCreateResource _init',
+        'Encoding Failed',
+        err,
+      );
+    }
+  }
+
+  /// [_createResource] creates the resources, which was defined by the user via
+  /// the code editor. To create the resource we have to extract the name and
+  /// namespace of the resource from the user input. Then we run a post request
+  /// against the Kubernetes API to create the resource.
+  Future<void> _createResource() async {
+    ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
+      context,
+      listen: false,
+    );
+    AppRepository appRepository = Provider.of<AppRepository>(
+      context,
+      listen: false,
+    );
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final cluster = await clustersRepository.getClusterWithCredentials(
+        clustersRepository.activeClusterId,
+      );
+      final manifest = appRepository.settings.editorFormat == 'json'
+          ? await compute(_createResourceDecodeJson, _codeController.text)
+          : await compute(_createResourceDecodeYaml, _codeController.text);
+      final name =
+          manifest['metadata'] != null && manifest['metadata']['name'] != null
+              ? manifest['metadata']['name']
+              : '';
+      final namespace = manifest['metadata'] != null &&
+              manifest['metadata']['namespace'] != null
+          ? manifest['metadata']['namespace']
+          : '';
+      final url =
+          '${widget.resource.path}${namespace != null && namespace != '' ? '/namespaces/$namespace' : ''}/${widget.resource.resource}';
+
+      Logger.log(
+        'ResourcesListItemCreateResource _createResource',
+        'Create ${widget.resource.singular}',
+        'Url: $url Manifest: $manifest',
+      );
+
+      await KubernetesService(
+        cluster: cluster!,
+        proxy: appRepository.settings.proxy,
+        timeout: appRepository.settings.timeout,
+      ).postRequest(url, jsonEncode(manifest));
+
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        showSnackbar(
+          context,
+          '${widget.resource.singular} Created',
+          namespace != null && namespace != ''
+              ? 'The ${widget.resource.singular} $namespace/$name was created'
+              : 'The ${widget.resource.singular} $name was created',
+        );
+        Navigator.pop(context);
+      }
+    } catch (err) {
+      Logger.log(
+        'ResourcesListItemCreateResource _createResource',
+        'Creation Failed',
+        err,
+      );
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Creation Failed',
+          err.toString(),
+        );
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    Provider.of<ThemeRepository>(
-      context,
-      listen: true,
+    return AppBottomSheetWidget(
+      title: 'Create',
+      subtitle: widget.resource.singular,
+      icon: Icons.create,
+      closePressed: () {
+        Navigator.pop(context);
+      },
+      actionText: 'Create',
+      actionPressed: () {
+        _createResource();
+      },
+      actionIsLoading: _isLoading,
+      child: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.only(
+            top: Constants.spacingMiddle,
+            bottom: Constants.spacingMiddle,
+            left: Constants.spacingMiddle,
+            right: Constants.spacingMiddle,
+          ),
+          child: CodeTheme(
+            data: CodeThemeData(
+              styles: Theme.of(context).extension<EditorColors>()!.getTheme(),
+            ),
+            child: CodeField(
+              controller: _codeController,
+              enabled: true,
+              textStyle: TextStyle(
+                fontSize: 14,
+                fontFamily: getMonospaceFontFamily(),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
-    Provider.of<AppRepository>(
+  }
+}
+
+/// The [ResourcesListItemDeleteResources] widget is used to delete multiple
+/// [items] of a [resource]. The widget displays a list of [items] and the user
+/// can select the items which should be deleted. The user can also enable the
+/// `force` option to delete the items immediately.
+class ResourcesListItemDeleteResources extends StatefulWidget {
+  const ResourcesListItemDeleteResources({
+    super.key,
+    required this.items,
+    required this.resource,
+  });
+
+  final List<ResourceItem> items;
+  final Resource resource;
+
+  @override
+  State<ResourcesListItemDeleteResources> createState() =>
+      _ResourcesListItemDeleteResourcesState();
+}
+
+class _ResourcesListItemDeleteResourcesState
+    extends State<ResourcesListItemDeleteResources> {
+  bool _isLoading = false;
+  bool _force = false;
+  List<ResourceItem> _selectedItems = <ResourceItem>[];
+
+  /// [_delete] is used to delete the selected [items] of the [resource]. The
+  /// function runs a delete request against the Kubernetes API to delete the
+  /// selected items.
+  Future<void> _delete() async {
+    ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
-      listen: true,
+      listen: false,
     );
-    Provider.of<ClustersRepository>(
+    AppRepository appRepository = Provider.of<AppRepository>(
       context,
-      listen: true,
+      listen: false,
     );
 
-    return FutureBuilder(
-      future: _futureFetchItems,
-      builder: (
-        BuildContext context,
-        AsyncSnapshot<ResourcesListResult> snapshot,
-      ) {
-        switch (snapshot.connectionState) {
-          case ConnectionState.none:
-          case ConnectionState.waiting:
-            return _buildLayout(
-              context,
+    String? body;
+    if (_force) {
+      body = '{"gracePeriodSeconds": 0}';
+    }
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final cluster = await clustersRepository.getClusterWithCredentials(
+        clustersRepository.activeClusterId,
+      );
+
+      for (final selectedItem in _selectedItems) {
+        final name = widget.resource.getName(selectedItem.item);
+        final namespace = widget.resource.getNamespace(selectedItem.item);
+
+        final url = namespace == null
+            ? '${widget.resource.path}/${widget.resource.resource}/$name'
+            : '${widget.resource.path}/namespaces/$namespace/${widget.resource.resource}/$name';
+
+        await KubernetesService(
+          cluster: cluster!,
+          proxy: appRepository.settings.proxy,
+          timeout: appRepository.settings.timeout,
+        ).deleteRequest(url, body);
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        showSnackbar(
+          context,
+          '${widget.resource.plural} Deleted',
+          'The selected ${widget.resource.plural} were deleted',
+        );
+        Navigator.pop(context);
+      }
+    } catch (err) {
+      Logger.log(
+        'DeleteResource _delete',
+        'Failed to Delete ${widget.resource.plural}',
+        err,
+      );
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Delete ${widget.resource.plural}',
+          err.toString(),
+        );
+      }
+    }
+  }
+
+  /// [_buildStatus] is a helper function to display the status of the resource.
+  /// The status can be `success`, `danger` or `warning`. The function returns
+  /// an icon with the color of the status. If the status is `undefined` the
+  /// function returns an empty container.
+  Widget? _buildStatus(BuildContext context, ResourceStatus status) {
+    if (status != ResourceStatus.undefined) {
+      return Wrap(
+        children: [
+          const SizedBox(width: Constants.spacingSmall),
+          Icon(
+            Icons.radio_button_checked,
+            size: 24,
+            color: status == ResourceStatus.success
+                ? Theme.of(context).extension<CustomColors>()!.success
+                : status == ResourceStatus.danger
+                    ? Theme.of(context).extension<CustomColors>()!.error
+                    : Theme.of(context).extension<CustomColors>()!.warning,
+          ),
+        ],
+      );
+    }
+
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBottomSheetWidget(
+      title: 'Delete',
+      subtitle: 'Select the ${widget.resource.plural} you want to delete',
+      icon: Icons.delete,
+      closePressed: () {
+        Navigator.pop(context);
+      },
+      actionText: 'Delete ${widget.resource.plural}',
+      actionPressed: () {
+        _delete();
+      },
+      actionIsLoading: _isLoading,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.only(
+            top: Constants.spacingMiddle,
+            bottom: Constants.spacingMiddle,
+            left: Constants.spacingMiddle,
+            right: Constants.spacingMiddle,
+          ),
+          child: Column(
+            children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(
-                      Constants.spacingMiddle,
-                    ),
-                    child: CircularProgressIndicator(
-                      color: theme(context).colorPrimary,
-                    ),
+                  const Text('Force'),
+                  Switch(
+                    activeColor: Theme.of(context).colorScheme.primary,
+                    onChanged: (value) {
+                      setState(() {
+                        _force = !_force;
+                      });
+                    },
+                    value: _force,
                   ),
                 ],
               ),
-            );
-          default:
-            if (snapshot.hasError) {
-              return _buildLayout(
-                context,
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Flexible(
-                      child: Padding(
-                        padding: const EdgeInsets.all(Constants.spacingMiddle),
-                        child: AppErrorWidget(
-                          message: 'Could not load ${widget.title}',
-                          details: snapshot.error.toString(),
-                          icon: Resources.map.containsKey(widget.resource) &&
-                                  Resources.map[widget.resource]!.path ==
-                                      widget.path
-                              ? 'assets/resources/${widget.resource}.svg'
-                              : null,
+              const SizedBox(height: Constants.spacingExtraLarge),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                separatorBuilder: (context, index) {
+                  return const SizedBox(
+                    height: Constants.spacingMiddle,
+                  );
+                },
+                itemCount: widget.items.length,
+                itemBuilder: (context, index) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context)
+                              .extension<CustomColors>()!
+                              .shadow,
+                          blurRadius: Constants.sizeBorderBlurRadius,
+                          spreadRadius: Constants.sizeBorderSpreadRadius,
+                          offset: const Offset(0.0, 0.0),
                         ),
+                      ],
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(Constants.sizeBorderRadius),
                       ),
                     ),
-                  ],
-                ),
-              );
-            }
-
-            Provider.of<BookmarksRepository>(
-              context,
-              listen: true,
-            );
-
-            final filteredItems = _getFilteredItems(snapshot.data!.items);
-
-            return _buildLayout(
-              context,
-              Wrap(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.only(
-                      top: Constants.spacingMiddle,
-                      bottom: Constants.spacingSmall,
-                      left: Constants.spacingMiddle,
-                      right: Constants.spacingMiddle,
-                    ),
-                    color: theme(context).colorPrimary,
-                    child: TextField(
-                      onChanged: (value) {
-                        setState(() {
-                          _filter = value;
-                        });
+                    child: CheckboxListTile(
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: _selectedItems
+                              .where(
+                                (e) =>
+                                    widget.resource.getName(e.item) ==
+                                        widget.resource.getName(
+                                          widget.items[index].item,
+                                        ) &&
+                                    widget.resource.getNamespace(e.item) ==
+                                        widget.resource.getNamespace(
+                                          widget.items[index].item,
+                                        ),
+                              )
+                              .toList()
+                              .length ==
+                          1,
+                      onChanged: (bool? value) {
+                        if (value == true) {
+                          setState(() {
+                            _selectedItems.add(widget.items[index]);
+                          });
+                        }
+                        if (value == false) {
+                          setState(() {
+                            _selectedItems = _selectedItems
+                                .where(
+                                  (e) => !(widget.resource.getName(e.item) ==
+                                          widget.resource.getName(
+                                            widget.items[index].item,
+                                          ) &&
+                                      widget.resource.getNamespace(e.item) ==
+                                          widget.resource.getNamespace(
+                                            widget.items[index].item,
+                                          )),
+                                )
+                                .toList();
+                          });
+                        }
                       },
-                      style: const TextStyle(
-                        color: Colors.white,
+                      title: Text(
+                        Characters(
+                          widget.resource.getName(widget.items[index].item),
+                        )
+                            .replaceAll(Characters(''), Characters('\u{200B}'))
+                            .toString(),
+                        style: noramlTextStyle(
+                          context,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      cursorColor: Colors.white,
-                      keyboardType: TextInputType.text,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      maxLines: 1,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide:
-                              BorderSide(color: Colors.white, width: 0.0),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide:
-                              BorderSide(color: Colors.white, width: 0.0),
-                        ),
-                        isDense: true,
-                        contentPadding: EdgeInsets.all(8),
-                        hintStyle: TextStyle(
-                          color: Colors.white,
-                        ),
-                        hintText: 'Filter...',
+                      subtitle: widget.resource
+                                  .getNamespace(widget.items[index].item) ==
+                              null
+                          ? null
+                          : Text(
+                              Characters(
+                                widget.resource.getNamespace(
+                                      widget.items[index].item,
+                                    ) ??
+                                    '',
+                              )
+                                  .replaceAll(
+                                    Characters(''),
+                                    Characters('\u{200B}'),
+                                  )
+                                  .toString(),
+                              style: secondaryTextStyle(
+                                context,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                      secondary: _buildStatus(
+                        context,
+                        widget.items[index].status,
                       ),
                     ),
-                  ),
-                  _buildHeaderActions(context),
-                  Container(
-                    padding: const EdgeInsets.only(
-                      top: Constants.spacingMiddle,
-                      bottom: Constants.spacingMiddle,
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(
-                        right: Constants.spacingMiddle,
-                        left: Constants.spacingMiddle,
-                      ),
-                      itemCount: filteredItems.length,
-                      itemBuilder: (context, index) {
-                        return _buildListItem(
-                          widget.title,
-                          widget.resource,
-                          widget.path,
-                          widget.scope,
-                          widget.additionalPrinterColumns,
-                          filteredItems[index],
-                          snapshot.data!.metrics,
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
-            );
-        }
-      },
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

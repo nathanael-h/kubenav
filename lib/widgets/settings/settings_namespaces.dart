@@ -3,14 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:kubenav/repositories/app_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/settings/namespaces/settings_add_namespace.dart';
 import 'package:kubenav/widgets/settings/namespaces/settings_delete_namespace.dart';
 import 'package:kubenav/widgets/shared/app_bottom_navigation_bar_widget.dart';
-import 'package:kubenav/widgets/shared/app_drawer.dart';
 import 'package:kubenav/widgets/shared/app_floating_action_buttons_widget.dart';
 import 'package:kubenav/widgets/shared/app_list_item.dart';
 
@@ -24,17 +23,30 @@ class SettingsNamespaces extends StatelessWidget {
 
   /// [_proxyDecorator] is used to highlight the bookmark which is currently
   /// draged by the user.
-  Widget _proxyDecorator(BuildContext context, Widget child, int index,
-      Animation<double> animation) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (BuildContext context, Widget? child) {
-        return Material(
-          elevation: 0,
-          child: child,
-        );
-      },
-      child: child,
+  Widget _proxyDecorator(
+    Widget child,
+    int index,
+    Animation<double> animation,
+  ) {
+    return Material(
+      elevation: 0,
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 16,
+            child: Material(
+              borderRadius: BorderRadius.circular(16),
+              elevation: 24,
+              color: Colors.transparent,
+            ),
+          ),
+          child,
+        ],
+      ),
     );
   }
 
@@ -48,11 +60,12 @@ class SettingsNamespaces extends StatelessWidget {
       listen: false,
     );
 
+    final namespace = appRepository.settings.namespaces[index];
+
     return Container(
-      key: Key(appRepository.settings.namespaces[index]),
+      key: Key(namespace),
       margin: const EdgeInsets.only(
-        top: Constants.spacingSmall,
-        bottom: Constants.spacingSmall,
+        bottom: Constants.spacingMiddle,
         left: Constants.spacingMiddle,
         right: Constants.spacingMiddle,
       ),
@@ -61,10 +74,36 @@ class SettingsNamespaces extends StatelessWidget {
           showActions(
             context,
             SettingsDeleteNamespace(
-              namespace: appRepository.settings.namespaces[index],
+              namespace: namespace,
             ),
           );
         },
+        onLongPress: () {
+          hapticFeedback();
+
+          showActions(
+            context,
+            SettingsDeleteNamespace(
+              namespace: namespace,
+            ),
+          );
+        },
+        slidableActions: [
+          AppListItemSlidableAction(
+            icon: Icons.delete,
+            label: 'Delete',
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
+            onTap: (BuildContext context) {
+              appRepository.deleteNamespace(namespace);
+              showSnackbar(
+                context,
+                'Namespace Deleted',
+                'The Namespace $namespace was deleted',
+              );
+            },
+          ),
+        ],
         child: Row(
           children: [
             Expanded(
@@ -73,7 +112,7 @@ class SettingsNamespaces extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    appRepository.settings.namespaces[index],
+                    namespace,
                     style: primaryTextStyle(
                       context,
                     ),
@@ -87,8 +126,9 @@ class SettingsNamespaces extends StatelessWidget {
               index: index,
               child: Icon(
                 Icons.drag_handle,
-                color: theme(context)
-                    .colorTextPrimary
+                color: Theme.of(context)
+                    .extension<CustomColors>()!
+                    .textPrimary
                     .withOpacity(Constants.opacityIcon),
               ),
             ),
@@ -100,17 +140,12 @@ class SettingsNamespaces extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Provider.of<ThemeRepository>(
-      context,
-      listen: true,
-    );
     AppRepository appRepository = Provider.of<AppRepository>(
       context,
       listen: true,
     );
 
     return Scaffold(
-      drawer: appRepository.settings.classicMode ? const AppDrawer() : null,
       appBar: AppBar(
         centerTitle: true,
         actions: [
@@ -126,15 +161,13 @@ class SettingsNamespaces extends StatelessWidget {
         ],
         title: const Text('Namespaces'),
       ),
-      bottomNavigationBar: appRepository.settings.classicMode
-          ? null
-          : const AppBottomNavigationBarWidget(),
+      bottomNavigationBar: const AppBottomNavigationBarWidget(),
       floatingActionButton: const AppFloatingActionButtonsWidget(),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
-              const SizedBox(height: Constants.spacingLarge),
+              const SizedBox(height: Constants.spacingMiddle),
               ReorderableListView.builder(
                 shrinkWrap: true,
                 buildDefaultDragHandles: false,
@@ -142,9 +175,13 @@ class SettingsNamespaces extends StatelessWidget {
                 onReorder: (int start, int current) {
                   appRepository.reorderNamespaces(start, current);
                 },
-                proxyDecorator:
-                    (Widget child, int index, Animation<double> animation) =>
-                        _proxyDecorator(context, child, index, animation),
+                proxyDecorator: (
+                  Widget child,
+                  int index,
+                  Animation<double> animation,
+                ) {
+                  return _proxyDecorator(child, index, animation);
+                },
                 itemCount: appRepository.settings.namespaces.length,
                 itemBuilder: (
                   context,
@@ -153,7 +190,6 @@ class SettingsNamespaces extends StatelessWidget {
                   return buildNamespace(context, index);
                 },
               ),
-              const SizedBox(height: Constants.spacingSmall),
             ],
           ),
         ),

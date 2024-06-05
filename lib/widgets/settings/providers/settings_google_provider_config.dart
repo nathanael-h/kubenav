@@ -5,7 +5,6 @@ import 'package:uuid/uuid.dart';
 
 import 'package:kubenav/models/cluster_provider.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/services/providers/google_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
@@ -53,19 +52,20 @@ class _SettingsGoogleProviderState extends State<SettingsGoogleProvider> {
     } catch (err) {
       Logger.log(
         'SettingsGoogleProvider _signIn',
-        'Could not open sign in url',
+        'Failed to Open Sign In Url',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not open sign in url',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Open Sign In Url',
+          err.toString(),
+        );
+      }
     }
   }
 
-  Future<void> _saveProvider(BuildContext context) async {
+  Future<void> _saveProvider() async {
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: false,
@@ -138,7 +138,7 @@ class _SettingsGoogleProviderState extends State<SettingsGoogleProvider> {
       } else {
         Logger.log(
           'SettingsGoogleProvider _saveProvider',
-          'Could not get credentials',
+          'Failed to Get Credentials',
           'Access Token: ${googleTokens.accessToken}, Expires In: ${googleTokens.expiresIn}, Refresh Token: ${googleTokens.refreshToken}',
         );
         setState(() {
@@ -148,7 +148,7 @@ class _SettingsGoogleProviderState extends State<SettingsGoogleProvider> {
         if (mounted) {
           showSnackbar(
             context,
-            'Could not get credentials',
+            'Failed to Get Credentials',
             'Access Token: ${googleTokens.accessToken}, Expires In: ${googleTokens.expiresIn}, Refresh Token: ${googleTokens.refreshToken}',
           );
         }
@@ -156,18 +156,19 @@ class _SettingsGoogleProviderState extends State<SettingsGoogleProvider> {
     } catch (err) {
       Logger.log(
         'SettingsGoogleProvider _saveProvider',
-        'Could not save provider configuration',
+        'Failed to Save Provider Configuration',
         err,
       );
       setState(() {
         _isLoading = false;
       });
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not save provider configuration',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Save Provider Configuration',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -206,128 +207,112 @@ class _SettingsGoogleProviderState extends State<SettingsGoogleProvider> {
       closePressed: () {
         Navigator.pop(context);
       },
-      actionText: widget.provider == null ? 'Save and add cluster(s)' : 'Save',
+      actionText: widget.provider == null ? 'Save and Add Cluster(s)' : 'Save',
       actionPressed: () {
-        _saveProvider(context);
+        _saveProvider();
       },
       actionIsLoading: _isLoading,
       child: Form(
         key: _providerConfigFormKey,
-        child: ListView(
-          shrinkWrap: false,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _nameController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Name',
-                ),
-                validator: _validator,
-              ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: Constants.spacingMiddle,
+              bottom: Constants.spacingMiddle,
+              left: Constants.spacingMiddle,
+              right: Constants.spacingMiddle,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _clientIDController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Client ID',
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Name',
+                  ),
+                  validator: _validator,
                 ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _clientSecretController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Client Secret',
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _clientIDController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Client ID',
+                  ),
+                  validator: _validator,
                 ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _redirectURLController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Redirect URL',
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _clientSecretController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Client Secret',
+                  ),
+                  validator: _validator,
                 ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme(context).colorPrimary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(40),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      Constants.sizeBorderRadius,
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _redirectURLController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Redirect URL',
+                  ),
+                  validator: _validator,
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size.fromHeight(40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        Constants.sizeBorderRadius,
+                      ),
                     ),
                   ),
-                ),
-                onPressed: _signIn,
-                child: Text(
-                  'Sign In',
-                  style: primaryTextStyle(
-                    context,
-                    color: Colors.white,
+                  onPressed: _signIn,
+                  child: Text(
+                    'Sign In',
+                    style: primaryTextStyle(
+                      context,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _codeController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Code',
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _codeController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Code',
+                  ),
+                  validator: _validator,
                 ),
-                validator: _validator,
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

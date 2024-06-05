@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import 'package:kubenav/models/cluster_provider.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/services/providers/aws_service.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
@@ -26,7 +25,7 @@ class _SettingsReauthenticateAWSSSOState
   bool _verified = false;
   AWSSSOCredentials? _awsSSOCredentials;
 
-  void _startSSOFlow() async {
+  Future<void> _startSSOFlow() async {
     try {
       final ssoConfig = await AWSService().getSSOConfig(
         _provider!.awssso!.ssoRegion ?? '',
@@ -35,7 +34,7 @@ class _SettingsReauthenticateAWSSSOState
 
       Logger.log(
         'SettingsReauthenticateAWSSSO _startSSOFlow',
-        'SSO config was returned',
+        'SSO Config',
         ssoConfig,
       );
       setState(() {
@@ -44,26 +43,27 @@ class _SettingsReauthenticateAWSSSOState
       if (mounted) {
         showSnackbar(
           context,
-          'Sing in completed',
+          'Sing in Completed',
           'You can now click on the verify button',
         );
       }
     } catch (err) {
       Logger.log(
         'SettingsReauthenticateAWSSSO _startSSOFlow',
-        'Could not get SSO configuration',
+        'Failed to Get SSO Configuration',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not get SSO configuration',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Get SSO Configuration',
+          err.toString(),
+        );
+      }
     }
   }
 
-  void _verifyDevice() async {
+  Future<void> _verifyDevice() async {
     try {
       await openUrl(_awsSSOConfig!.device!.verificationUriComplete!);
       setState(() {
@@ -72,15 +72,16 @@ class _SettingsReauthenticateAWSSSOState
     } catch (err) {
       Logger.log(
         'SettingsReauthenticateAWSSSO _verifyDevice',
-        'Could not verify device',
+        'Failed to Verify Device',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not verify device',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Verify Device',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -104,7 +105,7 @@ class _SettingsReauthenticateAWSSSOState
 
       Logger.log(
         'SettingsReauthenticateAWSSSO _getSSOCredentials',
-        'SSO config was returned',
+        'SSO Credentials',
         ssoCredentials,
       );
 
@@ -119,22 +120,23 @@ class _SettingsReauthenticateAWSSSOState
       if (mounted) {
         showSnackbar(
           context,
-          'Provider configuration saved',
+          'Provider Configuration Saved',
           'Refresh the view to use the new credentials',
         );
       }
     } catch (err) {
       Logger.log(
         'SettingsReauthenticateAWSSSO _startSSOFlow',
-        'Could not get SSO credentials',
+        'Failed to Get SSO Credentials',
         err,
       );
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not get SSO credentials',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Get SSO Credentials',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -169,8 +171,8 @@ class _SettingsReauthenticateAWSSSOState
           ),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: theme(context).colorPrimary,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               minimumSize: const Size.fromHeight(40),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(
@@ -183,7 +185,7 @@ class _SettingsReauthenticateAWSSSOState
               'Sign In',
               style: primaryTextStyle(
                 context,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onPrimary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -196,8 +198,8 @@ class _SettingsReauthenticateAWSSSOState
           ),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: theme(context).colorPrimary,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               minimumSize: const Size.fromHeight(40),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(
@@ -210,7 +212,7 @@ class _SettingsReauthenticateAWSSSOState
               'Verify',
               style: primaryTextStyle(
                 context,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onPrimary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -223,8 +225,8 @@ class _SettingsReauthenticateAWSSSOState
           ),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: theme(context).colorPrimary,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               minimumSize: const Size.fromHeight(40),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(
@@ -238,7 +240,7 @@ class _SettingsReauthenticateAWSSSOState
               'Get Credentials',
               style: primaryTextStyle(
                 context,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onPrimary,
               ),
               textAlign: TextAlign.center,
             ),

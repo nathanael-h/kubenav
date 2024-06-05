@@ -4,293 +4,346 @@ import 'package:provider/provider.dart';
 import 'package:xterm/ui.dart' as xtermui;
 import 'package:xterm/xterm.dart' as xterm;
 
-import 'package:kubenav/repositories/app_repository.dart';
 import 'package:kubenav/repositories/terminal_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
-
-/// [colors] is a list of all supported text colors of our terminal.
-List<Color> colors = [
-  const Color(0xffD8DEE9),
-  const Color(0xff81A1C1),
-  const Color(0xffB48EAD),
-  const Color(0xff8FBCBB),
-  const Color(0xffEBCB8B),
-  const Color(0xff88C0D0),
-  const Color(0xffA3BE8C),
-  const Color(0xff5E81AC),
-];
-
-/// [terminalTheme] is the theme for our terminal. These are the same colors as
-/// used the awesome Nord theme (https://www.nordtheme.com) which is currently
-/// my favorite theme.
-const xterm.TerminalTheme terminalTheme = xterm.TerminalTheme(
-  cursor: Color(0xffd8dee9),
-  selection: Color(0xff4c566a),
-  foreground: Color(0xffd8dee9),
-  background: Color(0xff2e3440),
-  black: Color(0xff3b4251),
-  red: Color(0xffbf6069),
-  green: Color(0xffa3be8b),
-  yellow: Color(0xffeacb8a),
-  blue: Color(0xff81a1c1),
-  magenta: Color(0xffb48dac),
-  cyan: Color(0xff88c0d0),
-  white: Color(0xffe5e9f0),
-  brightBlack: Color(0xff4c556a),
-  brightRed: Color(0xffbf6069),
-  brightGreen: Color(0xffa3be8b),
-  brightYellow: Color(0xffeacb8a),
-  brightBlue: Color(0xff81a1c1),
-  brightMagenta: Color(0xffb48dac),
-  brightCyan: Color(0xff8fbcbb),
-  brightWhite: Color(0xffeceef4),
-  searchHitBackground: Color(0xffeacb8a),
-  searchHitBackgroundCurrent: Color(0xffeacb8a),
-  searchHitForeground: Color(0xff2e3440),
-);
+import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
+import 'package:kubenav/widgets/shared/app_actions_widget.dart';
 
 /// [getColor] returns the correct color from the [colors] list for the provided
 /// [index].
-Color getColor(int index) {
+Color getColor(int index, List<Color> colors) {
   return colors[index % colors.length];
 }
 
-class AppTerminalsWidget extends StatelessWidget {
-  const AppTerminalsWidget({super.key});
+class AppTerminalsActionsWidget extends StatelessWidget {
+  const AppTerminalsActionsWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    AppRepository appRepository = Provider.of<AppRepository>(
-      context,
-      listen: false,
-    );
     TerminalRepository terminalRepository = Provider.of<TerminalRepository>(
       context,
       listen: true,
     );
 
-    final isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom != 0;
+    return AppActionsWidget(
+      actions: List.generate(
+        terminalRepository.terminals.length,
+        (index) => AppActionsWidgetAction(
+          title:
+              '${terminalRepository.terminals[index].type.toLocalizedString()}: ${terminalRepository.terminals[index].name}',
+          color: Theme.of(context).colorScheme.primary,
+          onTap: () {
+            Navigator.pop(context);
+            showActions(
+              context,
+              AppTerminalActionsWidget(
+                terminalIndex: index,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
 
-    return Container(
-      height: MediaQuery.of(context).size.height *
-          (isKeyboardVisible
-              ? 1
-              : appRepository.settings.fullHeightModals
-                  ? 1
-                  : 0.75),
-      color: Colors.transparent,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Container(
+class AppTerminalActionsWidget extends StatelessWidget {
+  const AppTerminalActionsWidget({
+    super.key,
+    required this.terminalIndex,
+  });
+
+  final int terminalIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    TerminalRepository terminalRepository = Provider.of<TerminalRepository>(
+      context,
+      listen: true,
+    );
+
+    return AppActionsWidget(
+      actions: [
+        AppActionsWidgetAction(
+          title: 'Open',
+          color: Theme.of(context).colorScheme.primary,
+          onTap: () {
+            Navigator.pop(context);
+            showModal(
+              context,
+              AppTerminalWidget(
+                terminalIndex: terminalIndex,
+              ),
+              fullScreen: true,
+            );
+          },
+        ),
+        AppActionsWidgetAction(
+          title: 'Delete',
+          color: Theme.of(context).extension<CustomColors>()!.error,
+          onTap: () {
+            terminalRepository.deleteTerminal(terminalIndex);
+            Navigator.pop(context);
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class AppTerminalWidget extends StatelessWidget {
+  const AppTerminalWidget({
+    super.key,
+    required this.terminalIndex,
+  });
+
+  final int terminalIndex;
+
+  /// [_buildContent] returns the content for the terminal, depending on the
+  /// [TerminalType].
+  Widget _buildContent(BuildContext context) {
+    TerminalRepository terminalRepository = Provider.of<TerminalRepository>(
+      context,
+      listen: false,
+    );
+
+    if (terminalRepository.terminals[terminalIndex].type == TerminalType.exec) {
+      if (terminalRepository.terminals[terminalIndex].terminal != null) {
+        return Padding(
           padding: const EdgeInsets.only(
             left: Constants.spacingMiddle,
             right: Constants.spacingMiddle,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(
-                padding: const EdgeInsets.only(
-                  top: Constants.spacingMiddle,
-                  bottom: Constants.spacingMiddle,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Flexible(
-                      child: Row(
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.only(
-                              right: Constants.spacingMiddle,
+          child: xtermui.TerminalView(
+            terminalRepository.terminals[terminalIndex].terminal!.terminal,
+            padding: const EdgeInsets.only(
+              top: Constants.spacingMiddle,
+              bottom: Constants.spacingMiddle,
+              left: Constants.spacingSmall,
+              right: Constants.spacingSmall,
+            ),
+            theme: Theme.of(context).extension<TerminalColors>()!.getTheme(),
+            textStyle: xterm.TerminalStyle(
+              fontSize: 14,
+              fontFamily: getMonospaceFontFamily(),
+            ),
+          ),
+        );
+      }
+
+      return Container();
+    }
+
+    if (terminalRepository.terminals[terminalIndex].type ==
+        TerminalType.logstream) {
+      if (terminalRepository.terminals[terminalIndex].logstream != null) {
+        return Padding(
+          padding: const EdgeInsets.only(
+            left: Constants.spacingMiddle,
+            right: Constants.spacingMiddle,
+          ),
+          child: xtermui.TerminalView(
+            terminalRepository.terminals[terminalIndex].logstream!.terminal,
+            padding: const EdgeInsets.only(
+              top: Constants.spacingMiddle,
+              bottom: Constants.spacingMiddle,
+              left: Constants.spacingSmall,
+              right: Constants.spacingSmall,
+            ),
+            theme: Theme.of(context).extension<TerminalColors>()!.getTheme(),
+            textStyle: xterm.TerminalStyle(
+              fontSize: 14,
+              fontFamily: getMonospaceFontFamily(),
+            ),
+          ),
+        );
+      }
+
+      return Container();
+    }
+
+    if (terminalRepository.terminals[terminalIndex].type == TerminalType.log) {
+      return SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.only(
+            top: Constants.spacingMiddle,
+            bottom: Constants.spacingMiddle,
+            left: Constants.spacingMiddle,
+            right: Constants.spacingMiddle,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(Constants.spacingSmall),
+            color: Theme.of(context).extension<TerminalColors>()!.background,
+            child: Wrap(
+              children: terminalRepository.terminals[terminalIndex].logs == null
+                  ? []
+                  : terminalRepository.terminals[terminalIndex].logs!
+                      .asMap()
+                      .entries
+                      .map(
+                        (e) => SelectableText(
+                          e.value.join('\n\n'),
+                          style: TextStyle(
+                            color: getColor(
+                              e.key,
+                              Theme.of(context)
+                                  .extension<LogColors>()!
+                                  .getTheme(),
                             ),
-                            padding: const EdgeInsets.all(
-                              Constants.spacingExtraSmall,
+                            fontSize: 14,
+                            fontFamily: getMonospaceFontFamily(),
+                          ),
+                        ),
+                      )
+                      .toList(),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container();
+  }
+
+  /// [_buildIcon] return the icon for the terminal, if the [TerminalType] is
+  /// `log` or `logstream` the icon for logs is returned. If the [TerminalType]
+  /// is `exec` the icon for a terminal is returned.
+  Widget _buildIcon(BuildContext context) {
+    TerminalRepository terminalRepository = Provider.of<TerminalRepository>(
+      context,
+      listen: false,
+    );
+
+    if (terminalRepository.terminals[terminalIndex].type == TerminalType.exec) {
+      return Icon(
+        Icons.terminal,
+        color: Theme.of(context).colorScheme.onPrimary,
+        size: 36,
+      );
+    }
+
+    if (terminalRepository.terminals[terminalIndex].type == TerminalType.log ||
+        terminalRepository.terminals[terminalIndex].type ==
+            TerminalType.logstream) {
+      return Icon(
+        Icons.subject,
+        color: Theme.of(context).colorScheme.onPrimary,
+        size: 36,
+      );
+    }
+
+    return Container();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    TerminalRepository terminalRepository = Provider.of<TerminalRepository>(
+      context,
+      listen: true,
+    );
+
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(
+              padding: const EdgeInsets.only(
+                top: Constants.spacingMiddle,
+                bottom: Constants.spacingMiddle,
+                left: Constants.spacingMiddle,
+                right: Constants.spacingMiddle,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Flexible(
+                    child: Row(
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(
+                            right: Constants.spacingMiddle,
+                          ),
+                          padding: const EdgeInsets.all(
+                            Constants.spacingExtraSmall,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(Constants.sizeBorderRadius),
                             ),
-                            decoration: BoxDecoration(
-                              color: theme(context).colorPrimary,
-                              borderRadius: const BorderRadius.all(
-                                Radius.circular(
-                                  Constants.sizeBorderRadius,
+                          ),
+                          height: 54,
+                          width: 54,
+                          child: _buildIcon(context),
+                        ),
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                terminalRepository.terminals[terminalIndex].type
+                                    .toLocalizedString(),
+                                overflow: TextOverflow.ellipsis,
+                                style: primaryTextStyle(
+                                  context,
+                                  size: 18,
                                 ),
                               ),
-                            ),
-                            height: 54,
-                            width: 54,
-                            child: const Icon(
-                              Icons.terminal,
-                              color: Colors.white,
-                              size: 36,
-                            ),
-                          ),
-                          Flexible(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Terminals',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: primaryTextStyle(
-                                    context,
-                                    size: 18,
-                                  ),
+                              Text(
+                                Characters(
+                                  terminalRepository
+                                      .terminals[terminalIndex].name,
+                                )
+                                    .replaceAll(
+                                      Characters(''),
+                                      Characters('\u{200B}'),
+                                    )
+                                    .toString(),
+                                overflow: TextOverflow.ellipsis,
+                                style: secondaryTextStyle(
+                                  context,
                                 ),
-                                Text(
-                                  Characters(
-                                    'You have ${terminalRepository.terminals.length} Terminals open',
-                                  )
-                                      .replaceAll(Characters(''),
-                                          Characters('\u{200B}'))
-                                      .toString(),
-                                  overflow: TextOverflow.ellipsis,
-                                  style: secondaryTextStyle(
-                                    context,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.close_outlined,
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.close_outlined,
+                      color: Theme.of(context)
+                          .extension<CustomColors>()!
+                          .textPrimary,
                     ),
-                  ],
-                ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
               ),
-              const Divider(
+            ),
+            const Padding(
+              padding: EdgeInsets.only(
+                left: Constants.spacingMiddle,
+                right: Constants.spacingMiddle,
+              ),
+              child: Divider(
                 height: 0,
                 thickness: 1.0,
               ),
-              const SizedBox(height: Constants.spacingMiddle),
-              Flexible(
-                child: DefaultTabController(
-                  length: terminalRepository.terminals.length,
-                  child: Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(Constants.sizeBorderRadius),
-                        ),
-                        child: SizedBox(
-                          height: 32,
-                          child: TabBar(
-                            isScrollable: true,
-                            labelColor: Colors.white,
-                            unselectedLabelColor: theme(context).colorPrimary,
-                            indicatorSize: TabBarIndicatorSize.tab,
-                            indicator: BoxDecoration(
-                              color: theme(context).colorPrimary,
-                            ),
-                            tabs: terminalRepository.terminals
-                                .asMap()
-                                .entries
-                                .map(
-                              (terminal) {
-                                return Tab(
-                                  child: GestureDetector(
-                                    onDoubleTap: () {
-                                      terminalRepository.deleteTerminal(
-                                        terminal.key,
-                                      );
-                                      if (terminalRepository
-                                          .terminals.isEmpty) {
-                                        Navigator.pop(context);
-                                      }
-                                    },
-                                    child: Text(
-                                      terminal.value.name,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ).toList(),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: Constants.spacingMiddle),
-                      Expanded(
-                        child: TabBarView(
-                          children:
-                              terminalRepository.terminals.asMap().entries.map(
-                            (terminal) {
-                              return terminal.value.type == TerminalType.exec
-                                  ? terminal.value.terminal != null
-                                      ? xtermui.TerminalView(
-                                          terminal.value.terminal!.terminal,
-                                          theme: terminalTheme,
-                                          textStyle: xterm.TerminalStyle(
-                                            fontSize: 14,
-                                            fontFamily:
-                                                getMonospaceFontFamily(),
-                                          ),
-                                        )
-                                      : Container()
-                                  : terminal.value.type ==
-                                          TerminalType.logstream
-                                      ? terminal.value.logstream != null
-                                          ? xtermui.TerminalView(
-                                              terminal
-                                                  .value.logstream!.terminal,
-                                              theme: terminalTheme,
-                                              textStyle: xterm.TerminalStyle(
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    getMonospaceFontFamily(),
-                                              ),
-                                            )
-                                          : Container()
-                                      : SingleChildScrollView(
-                                          physics:
-                                              const ClampingScrollPhysics(),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(
-                                              Constants.spacingSmall,
-                                            ),
-                                            color: const Color(0xff2E3440),
-                                            child: Wrap(
-                                              children: terminal.value.logs ==
-                                                      null
-                                                  ? []
-                                                  : terminal.value.logs!
-                                                      .asMap()
-                                                      .entries
-                                                      .map(
-                                                        (e) => SelectableText(
-                                                          e.value.join('\n\n'),
-                                                          style: TextStyle(
-                                                            color:
-                                                                getColor(e.key),
-                                                            fontSize: 14,
-                                                            fontFamily:
-                                                                getMonospaceFontFamily(),
-                                                          ),
-                                                        ),
-                                                      )
-                                                      .toList(),
-                                            ),
-                                          ),
-                                        );
-                            },
-                          ).toList(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: Constants.spacingMiddle),
-            ],
-          ),
+            ),
+            const SizedBox(height: Constants.spacingMiddle),
+            Expanded(
+              child: _buildContent(context),
+            ),
+            const SizedBox(height: Constants.spacingMiddle),
+          ],
         ),
       ),
     );

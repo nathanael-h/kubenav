@@ -5,7 +5,6 @@ import 'package:uuid/uuid.dart';
 
 import 'package:kubenav/models/cluster_provider.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/showmodal.dart';
 import 'package:kubenav/widgets/settings/clusters/settings_add_cluster_azure.dart';
@@ -43,7 +42,7 @@ class _SettingsAzureProviderState extends State<SettingsAzureProvider> {
     return null;
   }
 
-  Future<void> _saveProviderConfig(BuildContext context) async {
+  Future<void> _saveProviderConfig() async {
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: false,
@@ -104,12 +103,13 @@ class _SettingsAzureProviderState extends State<SettingsAzureProvider> {
       setState(() {
         _isLoading = false;
       });
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not save provider configuration',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Save Provider Configuration',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -146,123 +146,107 @@ class _SettingsAzureProviderState extends State<SettingsAzureProvider> {
       closePressed: () {
         Navigator.pop(context);
       },
-      actionText: widget.provider == null ? 'Save and add cluster(s)' : 'Save',
+      actionText: widget.provider == null ? 'Save and Add Cluster(s)' : 'Save',
       actionPressed: () {
-        _saveProviderConfig(context);
+        _saveProviderConfig();
       },
       actionIsLoading: _isLoading,
       child: Form(
         key: _providerConfigFormKey,
-        child: ListView(
-          shrinkWrap: false,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _nameController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Name',
-                ),
-                validator: _validator,
-              ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: Constants.spacingMiddle,
+              bottom: Constants.spacingMiddle,
+              left: Constants.spacingMiddle,
+              right: Constants.spacingMiddle,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _subscriptionIDController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Subscription ID',
-                ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _tenantIDController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Tenant ID',
-                ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _clientIDController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Client ID',
-                ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _clientSecretController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Client Secret',
-                ),
-                validator: _validator,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Text('Admin'),
-                  Switch(
-                    activeColor: theme(context).colorPrimary,
-                    onChanged: (val) {
-                      setState(() {
-                        _isAdmin = !_isAdmin;
-                      });
-                    },
-                    value: _isAdmin,
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Name',
                   ),
-                ],
-              ),
+                  validator: _validator,
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _subscriptionIDController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Subscription ID',
+                  ),
+                  validator: _validator,
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _tenantIDController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Tenant ID',
+                  ),
+                  validator: _validator,
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _clientIDController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Client ID',
+                  ),
+                  validator: _validator,
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _clientSecretController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Client Secret',
+                  ),
+                  validator: _validator,
+                ),
+                const SizedBox(height: Constants.spacingMiddle),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('Admin'),
+                    Switch(
+                      activeColor: Theme.of(context).colorScheme.primary,
+                      onChanged: (val) {
+                        setState(() {
+                          _isAdmin = !_isAdmin;
+                        });
+                      },
+                      value: _isAdmin,
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -48,7 +47,7 @@ class AppRepository with ChangeNotifier {
     } catch (err) {
       Logger.log(
         'AppRepository _save',
-        'Could not save settings',
+        'Failed to Save Settings',
         err,
       );
     }
@@ -72,8 +71,7 @@ class AppRepository with ChangeNotifier {
         _settings = AppRepositorySettings.fromJson(json.decode(data));
       }
 
-      if ((Platform.isAndroid || Platform.isIOS) &&
-          _settings.isAuthenticationEnabled) {
+      if (_settings.isAuthenticationEnabled) {
         await authenticate();
         _isAuthenticated = true;
       } else {
@@ -88,7 +86,7 @@ class AppRepository with ChangeNotifier {
     } catch (err) {
       Logger.log(
         'AppRepository _init',
-        'Could not load settings',
+        'Failed to Load Settings',
         err,
       );
     }
@@ -123,7 +121,7 @@ class AppRepository with ChangeNotifier {
             notifyListeners();
           } else {
             Logger.log(
-              'Enable / disable Authentication failed',
+              'Enable / Disable Authentication Failed',
               'Authentication could not be enabled, because the device hasn\'t any biometrics enrolled.',
             );
             throw Exception(
@@ -132,7 +130,7 @@ class AppRepository with ChangeNotifier {
           }
         } else {
           Logger.log(
-            'Enable / disable Authentication failed',
+            'Enable / Disable Authentication Failed',
             'Authentication could not be enabled, because the device is not supported.',
           );
           throw Exception(
@@ -142,7 +140,7 @@ class AppRepository with ChangeNotifier {
       }
     } catch (err) {
       Logger.log(
-        'Enable / disable Authentication failed',
+        'Enable / Disable Authentication Failed',
         err.toString(),
       );
       rethrow;
@@ -279,6 +277,16 @@ class AppRepository with ChangeNotifier {
     } catch (_) {}
   }
 
+  /// [setHome] changes the users Home page configuration to the provided
+  /// [value].
+  Future<void> setHome(AppRepositorySettingsHome value) async {
+    try {
+      _settings.home = value;
+      await _save();
+      notifyListeners();
+    } catch (_) {}
+  }
+
   /// [setPrometheus] changes the users Prometheus configuration to the provided
   /// [value].
   Future<void> setPrometheus(AppRepositorySettingsPrometheus value) async {
@@ -327,28 +335,6 @@ class AppRepository with ChangeNotifier {
       notifyListeners();
     } catch (_) {}
   }
-
-  /// [setFullHeightModals] enables or disables full height modals. When the
-  /// [value] is `true` full height modals will be enabled. If the [value] is
-  /// `false` the will be disabled.
-  Future<void> setFullHeightModals(bool value) async {
-    try {
-      _settings.fullHeightModals = value;
-      await _save();
-      notifyListeners();
-    } catch (_) {}
-  }
-
-  /// [setClassicMode] enables or disables the classic navigation mode known
-  /// from version 3. When the [value] is `true` classic mode will be enabled.
-  /// If the [value] is `false` it will be disabled.
-  Future<void> setClassicMode(bool value) async {
-    try {
-      _settings.classicMode = value;
-      await _save();
-      notifyListeners();
-    } catch (_) {}
-  }
 }
 
 /// The [AppRepositorySettings] model represents all the app settings which can
@@ -358,11 +344,10 @@ class AppRepositorySettings {
   bool isAuthenticationEnabled;
   bool isShowClustersOnStart;
   String editorFormat;
-  bool fullHeightModals;
-  bool classicMode;
   String proxy;
   int timeout;
   int sponsorReminder;
+  AppRepositorySettingsHome home;
   AppRepositorySettingsPrometheus prometheus;
 
   AppRepositorySettings({
@@ -370,11 +355,10 @@ class AppRepositorySettings {
     required this.isAuthenticationEnabled,
     required this.isShowClustersOnStart,
     required this.editorFormat,
-    required this.fullHeightModals,
-    required this.classicMode,
     required this.proxy,
     required this.timeout,
     required this.sponsorReminder,
+    required this.home,
     required this.prometheus,
   });
 
@@ -384,11 +368,10 @@ class AppRepositorySettings {
       isAuthenticationEnabled: false,
       isShowClustersOnStart: false,
       editorFormat: 'yaml',
-      fullHeightModals: false,
-      classicMode: false,
       proxy: '',
       timeout: 0,
       sponsorReminder: 0,
+      home: AppRepositorySettingsHome.fromDefault(),
       prometheus: AppRepositorySettingsPrometheus.fromDefault(),
     );
   }
@@ -410,14 +393,6 @@ class AppRepositorySettings {
           data.containsKey('editorFormat') && data['editorFormat'] != null
               ? data['editorFormat']
               : 'yaml',
-      fullHeightModals: data.containsKey('fullHeightModals') &&
-              data['fullHeightModals'] != null
-          ? data['fullHeightModals']
-          : false,
-      classicMode:
-          data.containsKey('classicMode') && data['classicMode'] != null
-              ? data['classicMode']
-              : false,
       proxy: data.containsKey('proxy') && data['proxy'] != null
           ? data['proxy']
           : '',
@@ -428,6 +403,9 @@ class AppRepositorySettings {
           data.containsKey('sponsorReminder') && data['sponsorReminder'] != null
               ? data['sponsorReminder']
               : 0,
+      home: data.containsKey('home') && data['home'] != null
+          ? AppRepositorySettingsHome.fromJson(data['home'])
+          : AppRepositorySettingsHome.fromDefault(),
       prometheus: data.containsKey('prometheus') && data['prometheus'] != null
           ? AppRepositorySettingsPrometheus.fromJson(data['prometheus'])
           : AppRepositorySettingsPrometheus.fromDefault(),
@@ -440,12 +418,98 @@ class AppRepositorySettings {
       'isAuthenticationEnabled': isAuthenticationEnabled,
       'isShowClustersOnStart': isShowClustersOnStart,
       'editorFormat': editorFormat,
-      'fullHeightModals': fullHeightModals,
-      'classicMode': classicMode,
       'proxy': proxy,
       'timeout': timeout,
       'sponsorReminder': sponsorReminder,
+      'home': home.toJson(),
       'prometheus': prometheus.toJson(),
+    };
+  }
+}
+
+/// The [AppRepositorySettingsHome] model represents all the
+/// configurations which can be set by a user for the home page.
+class AppRepositorySettingsHome {
+  bool useSelectedNamespace;
+  bool showMetrics;
+  bool showWarnings;
+  bool showWorkloadPods;
+  bool showWorkloadDeployments;
+  bool showWorkloadStatefulSets;
+  bool showWorkloadDaemonSets;
+  bool showWorkloadJobs;
+
+  AppRepositorySettingsHome({
+    required this.useSelectedNamespace,
+    required this.showMetrics,
+    required this.showWarnings,
+    required this.showWorkloadPods,
+    required this.showWorkloadDeployments,
+    required this.showWorkloadStatefulSets,
+    required this.showWorkloadDaemonSets,
+    required this.showWorkloadJobs,
+  });
+
+  factory AppRepositorySettingsHome.fromDefault() {
+    return AppRepositorySettingsHome(
+      useSelectedNamespace: false,
+      showMetrics: true,
+      showWarnings: true,
+      showWorkloadPods: false,
+      showWorkloadDeployments: false,
+      showWorkloadStatefulSets: false,
+      showWorkloadDaemonSets: false,
+      showWorkloadJobs: false,
+    );
+  }
+
+  factory AppRepositorySettingsHome.fromJson(Map<String, dynamic> data) {
+    return AppRepositorySettingsHome(
+      useSelectedNamespace: data.containsKey('useSelectedNamespace') &&
+              data['useSelectedNamespace'] != null
+          ? data['useSelectedNamespace']
+          : false,
+      showMetrics:
+          data.containsKey('showMetrics') && data['showMetrics'] != null
+              ? data['showMetrics']
+              : true,
+      showWarnings:
+          data.containsKey('showWarnings') && data['showWarnings'] != null
+              ? data['showWarnings']
+              : true,
+      showWorkloadPods: data.containsKey('showWorkloadPods') &&
+              data['showWorkloadPods'] != null
+          ? data['showWorkloadPods']
+          : true,
+      showWorkloadDeployments: data.containsKey('showWorkloadDeployments') &&
+              data['showWorkloadDeployments'] != null
+          ? data['showWorkloadDeployments']
+          : true,
+      showWorkloadStatefulSets: data.containsKey('showWorkloadStatefulSets') &&
+              data['showWorkloadStatefulSets'] != null
+          ? data['showWorkloadStatefulSets']
+          : true,
+      showWorkloadDaemonSets: data.containsKey('showWorkloadDaemonSets') &&
+              data['showWorkloadDaemonSets'] != null
+          ? data['showWorkloadDaemonSets']
+          : true,
+      showWorkloadJobs: data.containsKey('showWorkloadJobs') &&
+              data['showWorkloadJobs'] != null
+          ? data['showWorkloadJobs']
+          : true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'useSelectedNamespace': useSelectedNamespace,
+      'showMetrics': showMetrics,
+      'showWarnings': showWarnings,
+      'showWorkloadPods': showWorkloadPods,
+      'showWorkloadDeployments': showWorkloadDeployments,
+      'showWorkloadStatefulSets': showWorkloadStatefulSets,
+      'showWorkloadDaemonSets': showWorkloadDaemonSets,
+      'showWorkloadJobs': showWorkloadJobs,
     };
   }
 }

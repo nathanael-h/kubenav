@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_svg/flutter_svg.dart';
 
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
+import 'package:kubenav/utils/themes.dart';
 
 /// [AppHorizontalListCardsModel] is the model, which is used to create a card
 /// in the horizontal list. The [subtitle] of a card is of the type
@@ -32,24 +32,6 @@ class AppHorizontalListCardsModel {
 /// function. To create the list the user must also provide an [title] for the
 /// list and some optional more arguments. When the more prefixed arguments are
 /// provided the [moreText] and [moreIcon] will be displayed next to the title.
-/// The widget can be used as follows:
-///
-/// ```
-/// AppHorizontalListCardsWidget(
-///   title: 'Add Cluster',
-///   cards: List.generate(
-///     controller.providers.length,
-///     (index) => AppHorizontalListCardsModel(
-///       title: controller.providers[index].title,
-///       subtitle: controller.providers[index].subtitle,
-///       image: controller.providers[index].image,
-///       onTap: () {
-///         controller.showAddClusterBottomSheet(index);
-///       },
-///     ),
-///   ),
-/// ),
-///  ```
 class AppHorizontalListCardsWidget extends StatelessWidget {
   const AppHorizontalListCardsWidget({
     super.key,
@@ -78,19 +60,19 @@ class AppHorizontalListCardsWidget extends StatelessWidget {
     if (moreText != null && moreIcon != null) {
       return InkWell(
         onTap: moreOnTap,
-        child: Wrap(
+        child: Row(
           children: [
             Text(
               moreText,
               style: secondaryTextStyle(
                 context,
-                color: theme(context).colorPrimary,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
             const SizedBox(width: Constants.spacingExtraSmall),
             Icon(
               moreIcon,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
               size: 16,
             ),
           ],
@@ -111,16 +93,18 @@ class AppHorizontalListCardsWidget extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: subtitle
-          .map((e) => Text(
-                Characters(e)
-                    .replaceAll(Characters(''), Characters('\u{200B}'))
-                    .toString(),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-                style: secondaryTextStyle(
-                  context,
-                ),
-              ))
+          .map(
+            (e) => Text(
+              Characters(e)
+                  .replaceAll(Characters(''), Characters('\u{200B}'))
+                  .toString(),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: secondaryTextStyle(
+                context,
+              ),
+            ),
+          )
           .toList(),
     );
   }
@@ -171,13 +155,14 @@ class AppHorizontalListCardsWidget extends StatelessWidget {
                 decoration: BoxDecoration(
                   boxShadow: [
                     BoxShadow(
-                      color: theme(context).colorShadow,
+                      color:
+                          Theme.of(context).extension<CustomColors>()!.shadow,
                       blurRadius: Constants.sizeBorderBlurRadius,
                       spreadRadius: Constants.sizeBorderSpreadRadius,
                       offset: const Offset(0.0, 0.0),
                     ),
                   ],
-                  color: theme(context).colorCard,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: const BorderRadius.all(
                     Radius.circular(Constants.sizeBorderRadius),
                   ),
@@ -189,7 +174,7 @@ class AppHorizontalListCardsWidget extends StatelessWidget {
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: theme(context).colorPrimary,
+                          color: Theme.of(context).colorScheme.primary,
                           borderRadius: const BorderRadius.only(
                             topLeft:
                                 Radius.circular(Constants.sizeBorderRadius),
@@ -225,7 +210,9 @@ class AppHorizontalListCardsWidget extends StatelessWidget {
                         child: Text(
                           Characters(cards[index].title)
                               .replaceAll(
-                                  Characters(''), Characters('\u{200B}'))
+                                Characters(''),
+                                Characters('\u{200B}'),
+                              )
                               .toString(),
                           overflow: TextOverflow.ellipsis,
                           style: primaryTextStyle(

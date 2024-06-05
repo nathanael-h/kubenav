@@ -41,7 +41,7 @@ class _SettingsDigitalOceanProviderState
     return null;
   }
 
-  Future<void> _saveProvider(BuildContext context) async {
+  Future<void> _saveProvider() async {
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: false,
@@ -93,18 +93,19 @@ class _SettingsDigitalOceanProviderState
     } catch (err) {
       Logger.log(
         'SettingsDigitalOceanProvider _saveProvider',
-        'Could not save provider configuration',
+        'Failed to Save Provider Configuration',
         err,
       );
       setState(() {
         _isLoading = false;
       });
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Could not save provider configuration',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Save Provider Configuration',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -133,51 +134,51 @@ class _SettingsDigitalOceanProviderState
       closePressed: () {
         Navigator.pop(context);
       },
-      actionText: widget.provider == null ? 'Save and add cluster(s)' : 'Save',
+      actionText: widget.provider == null ? 'Save and Add Cluster(s)' : 'Save',
       actionPressed: () {
-        _saveProvider(context);
+        _saveProvider();
       },
       actionIsLoading: _isLoading,
       child: Form(
         key: _providerConfigFormKey,
-        child: ListView(
-          shrinkWrap: false,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _nameController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Name',
-                ),
-                validator: _validator,
-              ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: Constants.spacingMiddle,
+              bottom: Constants.spacingMiddle,
+              left: Constants.spacingMiddle,
+              right: Constants.spacingMiddle,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Constants.spacingSmall,
-              ),
-              child: TextFormField(
-                controller: _tokenController,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLines: 1,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'API Token',
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Name',
+                  ),
+                  validator: _validator,
                 ),
-                validator: _validator,
-              ),
+                const SizedBox(height: Constants.spacingMiddle),
+                TextFormField(
+                  controller: _tokenController,
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'API Token',
+                  ),
+                  validator: _validator,
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

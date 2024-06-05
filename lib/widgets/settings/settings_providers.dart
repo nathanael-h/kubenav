@@ -4,15 +4,13 @@ import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
 
 import 'package:kubenav/models/cluster_provider.dart';
-import 'package:kubenav/repositories/app_repository.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/settings/providers/settings_provider_actions.dart';
 import 'package:kubenav/widgets/shared/app_bottom_navigation_bar_widget.dart';
-import 'package:kubenav/widgets/shared/app_drawer.dart';
 import 'package:kubenav/widgets/shared/app_floating_action_buttons_widget.dart';
 import 'package:kubenav/widgets/shared/app_list_item.dart';
 
@@ -32,15 +30,68 @@ class SettingsProviders extends StatelessWidget {
   /// [SettingsProviderActions] actions, where the user can then delete or
   /// modify the provider.
   Widget buildProvider(BuildContext context, ClusterProvider provider) {
+    ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
+      context,
+      listen: false,
+    );
+
     return AppListItem(
       onTap: () {
-        showActions(context, SettingsProviderActions(provider: provider));
+        showActions(
+          context,
+          SettingsProviderActions(provider: provider),
+        );
       },
+      onLongPress: () {
+        hapticFeedback();
+
+        showActions(
+          context,
+          SettingsProviderActions(provider: provider),
+        );
+      },
+      slidableActions: [
+        AppListItemSlidableAction(
+          icon: Icons.edit,
+          label: 'Edit',
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          onTap: (BuildContext context) {
+            showModal(context, buildProviderModal(provider));
+          },
+        ),
+        AppListItemSlidableAction(
+          icon: Icons.delete,
+          label: 'Delete',
+          backgroundColor: Theme.of(context).colorScheme.error,
+          foregroundColor: Theme.of(context).colorScheme.onError,
+          onTap: (BuildContext context) async {
+            try {
+              await clustersRepository.deleteProvider(provider.id!);
+              if (context.mounted) {
+                showSnackbar(
+                  context,
+                  'Provider Deleted',
+                  'The provider ${provider.name} was deleted',
+                );
+              }
+            } catch (err) {
+              if (context.mounted) {
+                showSnackbar(
+                  context,
+                  'Failed to Delete Provider',
+                  err.toString(),
+                );
+              }
+            }
+          },
+        ),
+      ],
       child: Row(
         children: [
           Container(
             decoration: BoxDecoration(
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
               borderRadius: const BorderRadius.all(
                 Radius.circular(Constants.sizeBorderRadius),
               ),
@@ -88,8 +139,9 @@ class SettingsProviders extends StatelessWidget {
           const SizedBox(width: Constants.spacingSmall),
           Icon(
             Icons.arrow_forward_ios,
-            color: theme(context)
-                .colorTextSecondary
+            color: Theme.of(context)
+                .extension<CustomColors>()!
+                .textSecondary
                 .withOpacity(Constants.opacityIcon),
             size: 24,
           ),
@@ -100,34 +152,23 @@ class SettingsProviders extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Provider.of<ThemeRepository>(
-      context,
-      listen: true,
-    );
-    AppRepository appRepository = Provider.of<AppRepository>(
-      context,
-      listen: true,
-    );
     ClustersRepository clustersRepository = Provider.of<ClustersRepository>(
       context,
       listen: true,
     );
 
     return Scaffold(
-      drawer: appRepository.settings.classicMode ? const AppDrawer() : null,
       appBar: AppBar(
         centerTitle: true,
         title: const Text('Providers'),
       ),
-      bottomNavigationBar: appRepository.settings.classicMode
-          ? null
-          : const AppBottomNavigationBarWidget(),
+      bottomNavigationBar: const AppBottomNavigationBarWidget(),
       floatingActionButton: const AppFloatingActionButtonsWidget(),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
-              const SizedBox(height: Constants.spacingLarge),
+              const SizedBox(height: Constants.spacingMiddle),
               ListView.separated(
                 physics: const NeverScrollableScrollPhysics(),
                 shrinkWrap: true,
@@ -144,7 +185,7 @@ class SettingsProviders extends StatelessWidget {
                   clustersRepository.providers[index],
                 ),
               ),
-              const SizedBox(height: Constants.spacingSmall),
+              const SizedBox(height: Constants.spacingMiddle),
             ],
           ),
         ),

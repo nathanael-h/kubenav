@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/helpers.dart';
 import 'package:kubenav/utils/showmodal.dart';
+import 'package:kubenav/utils/themes.dart';
 import 'package:kubenav/widgets/home/overview/overview_metric.dart';
 
 /// The [OverviewMetrics] widget shows three icons, one for the CPU, one for the
@@ -39,13 +39,13 @@ class OverviewMetrics extends StatelessWidget {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: theme(context).colorShadow,
+              color: Theme.of(context).extension<CustomColors>()!.shadow,
               blurRadius: Constants.sizeBorderBlurRadius,
               spreadRadius: Constants.sizeBorderSpreadRadius,
               offset: const Offset(0.0, 0.0),
             ),
           ],
-          color: theme(context).colorCard,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: const BorderRadius.all(
             Radius.circular(Constants.sizeBorderRadius),
           ),
@@ -54,7 +54,7 @@ class OverviewMetrics extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: theme(context).colorPrimary,
+              color: Theme.of(context).colorScheme.primary,
               size: 64,
             ),
             const SizedBox(height: Constants.spacingSmall),
@@ -92,11 +92,8 @@ class OverviewMetrics extends StatelessWidget {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.only(
-            top: Constants.spacingMiddle,
-            left: Constants.spacingMiddle,
-            right: Constants.spacingMiddle,
-            bottom: Constants.spacingMiddle,
+          padding: const EdgeInsets.all(
+            Constants.spacingMiddle,
           ),
           child: Row(
             children: [
@@ -109,47 +106,55 @@ class OverviewMetrics extends StatelessWidget {
             ],
           ),
         ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            buildCard(
-              context,
-              'CPU',
-              Icons.bar_chart,
-              () {
-                showMetrics(
-                  context,
-                  MetricType.cpu,
-                  Icons.bar_chart,
-                );
-              },
-            ),
-            buildCard(
-              context,
-              'Memory',
-              Icons.area_chart,
-              () {
-                showMetrics(
-                  context,
-                  MetricType.memory,
-                  Icons.area_chart,
-                );
-              },
-            ),
-            buildCard(
-              context,
-              'Pods',
-              Icons.pie_chart,
-              () {
-                showMetrics(
-                  context,
-                  MetricType.pods,
-                  Icons.pie_chart,
-                );
-              },
-            ),
-          ],
-        )
+        Padding(
+          padding: const EdgeInsets.only(
+            left: Constants.spacingMiddle,
+            right: Constants.spacingMiddle,
+          ),
+          child: Row(
+            mainAxisAlignment: isTablet(context)
+                ? MainAxisAlignment.spaceEvenly
+                : MainAxisAlignment.spaceBetween,
+            children: [
+              buildCard(
+                context,
+                'CPU',
+                Icons.bar_chart,
+                () {
+                  showMetrics(
+                    context,
+                    MetricType.cpu,
+                    Icons.bar_chart,
+                  );
+                },
+              ),
+              buildCard(
+                context,
+                'Memory',
+                Icons.area_chart,
+                () {
+                  showMetrics(
+                    context,
+                    MetricType.memory,
+                    Icons.area_chart,
+                  );
+                },
+              ),
+              buildCard(
+                context,
+                'Pods',
+                Icons.pie_chart,
+                () {
+                  showMetrics(
+                    context,
+                    MetricType.pods,
+                    Icons.pie_chart,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

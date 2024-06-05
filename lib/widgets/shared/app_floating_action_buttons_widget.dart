@@ -6,7 +6,6 @@ import 'package:kubenav/repositories/app_repository.dart';
 import 'package:kubenav/repositories/clusters_repository.dart';
 import 'package:kubenav/repositories/portforwarding_repository.dart';
 import 'package:kubenav/repositories/terminal_repository.dart';
-import 'package:kubenav/repositories/theme_repository.dart';
 import 'package:kubenav/utils/constants.dart';
 import 'package:kubenav/utils/showmodal.dart';
 import 'package:kubenav/widgets/shared/app_portforwarding_sessions_widget.dart';
@@ -61,12 +60,13 @@ class _AppFloatingActionButtonsWidgetState
         );
       }
     } catch (err) {
-      if (!context.mounted) return;
-      showSnackbar(
-        context,
-        'Port Forwarding Session could not be shown',
-        err.toString(),
-      );
+      if (mounted) {
+        showSnackbar(
+          context,
+          'Failed to Show Port Forwarding Sessions',
+          err.toString(),
+        );
+      }
     }
   }
 
@@ -91,16 +91,16 @@ class _AppFloatingActionButtonsWidgetState
       floatingActionButtons.add(
         FloatingActionButton(
           heroTag: 'terminal',
-          backgroundColor: theme(context).colorPrimary,
+          backgroundColor: Theme.of(context).colorScheme.primary,
           onPressed: () {
-            showModal(
+            showActions(
               context,
-              const AppTerminalsWidget(),
+              const AppTerminalsActionsWidget(),
             );
           },
-          child: const Icon(
+          child: Icon(
             Icons.terminal,
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onPrimary,
           ),
         ),
       );
@@ -110,13 +110,13 @@ class _AppFloatingActionButtonsWidgetState
       floatingActionButtons.add(
         FloatingActionButton(
           heroTag: 'portforwarding',
-          backgroundColor: theme(context).colorPrimary,
+          backgroundColor: Theme.of(context).colorScheme.primary,
           onPressed: () {
             _showPortForwardingSessions();
           },
-          child: const Icon(
+          child: Icon(
             Icons.link,
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onPrimary,
           ),
         ),
       );
